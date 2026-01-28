@@ -7,6 +7,7 @@ public class RETURNTests : IDisposable
     public RETURNTests()
     {
         _harmony = new Harmony("tests.patchextensions.return");
+        MixinLoader.ConflictResolutionMethod = MixinLoader.ConflictResolver.Error;
         MixinLoader.ApplyPatches(_harmony, typeof(RETURNTests).Assembly, typeof(ReturnPatches));
     }
 

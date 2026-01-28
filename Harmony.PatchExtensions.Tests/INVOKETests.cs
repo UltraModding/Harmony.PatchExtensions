@@ -7,6 +7,7 @@ public class INVOKETests : IDisposable
     public INVOKETests()
     {
         _harmony = new Harmony("tests.patchextensions.invoke");
+        MixinLoader.ConflictResolutionMethod = MixinLoader.ConflictResolver.Error;
         MixinLoader.ApplyPatches(_harmony, typeof(INVOKETests).Assembly, typeof(InvokePatches));
     }
 

@@ -7,6 +7,7 @@ public class REDIRECTTests : IDisposable
     public REDIRECTTests()
     {
         _harmony = new Harmony("tests.patchextensions.redirect");
+        MixinLoader.ConflictResolutionMethod = MixinLoader.ConflictResolver.Error;
         MixinLoader.ApplyPatches(_harmony, typeof(REDIRECTTests).Assembly, typeof(RedirectPatches));
     }
 

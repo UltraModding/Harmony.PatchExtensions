@@ -7,6 +7,7 @@ public class HEADTests : IDisposable
     public HEADTests()
     {
         _harmony = new Harmony("tests.patchextensions.head");
+        MixinLoader.ConflictResolutionMethod = MixinLoader.ConflictResolver.Error;
         MixinLoader.ApplyPatches(_harmony, typeof(HEADTests).Assembly, typeof(HeadPatches));
     }
 

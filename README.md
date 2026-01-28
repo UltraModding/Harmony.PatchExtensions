@@ -12,9 +12,7 @@ Attribute based extensions for Harmony that lets you define mixin style patches.
 ## Install
 Use one of the following:
 - Reference the project directly in your solution
-- Install the published NuGet package if available
-
-Targets: `net8.0`, `net6.0`, `netstandard2.0`, `netstandard2.1`
+- Install the published NuGet package: (Insert package when uploaded here)
 
 ## Quick Start
 ```csharp
@@ -28,6 +26,8 @@ public static class Program
     {
         var harmony = new Harmony("example.patching");
         MixinLoader.ApplyPatches(harmony, Assembly.GetExecutingAssembly());
+        // Or for using a single patch class 
+        // MixinLoader.ApplyPatches(harmony, Assembly.GetExecutingAssembly(), typeof(Patches));
     }
 }
 ```
@@ -48,7 +48,7 @@ public static class Patches
     [Patch(typeof(Target), "Add", AT.HEAD)]
     private static void AddPrefix(int a, int b)
     {
-        // Runs before Target.Add
+        // Will run before Target.Add
     }
 }
 ```
@@ -122,8 +122,6 @@ public static class RedirectPatches
 ## Conflict Resolution
 When multiple patches/transpilers target the same method, set the resolution strategy:
 ```csharp
-using PatchExtensions;
-
 MixinLoader.ConflictResolutionMethod = MixinLoader.ConflictResolver.Warn;
 ```
 
