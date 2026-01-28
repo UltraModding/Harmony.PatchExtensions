@@ -249,7 +249,7 @@ public static class MixinLoader
         }
     }
     
-    public static IEnumerable<CodeInstruction> TranspilerPiler(IEnumerable<CodeInstruction> instructions, MethodBase original)
+    private static IEnumerable<CodeInstruction> TranspilerPiler(IEnumerable<CodeInstruction> instructions, MethodBase original)
     {
         if (!_queuedTranspilers.TryGetValue(original, out var transpilerConfigs))
             return instructions;
