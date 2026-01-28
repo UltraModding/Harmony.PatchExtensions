@@ -1,7 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
@@ -12,6 +11,8 @@
         <RepositoryUrl>https://github.com/UltraModding/Harmony.PatchExtensions/tree/master</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
         <PackageTags>csharp, dotnet, harmony, harmonylib, reflection, library, patching</PackageTags>
+        <TargetFrameworks>net8.0;net6.0;netstandard2.0;netstandard2.1</TargetFrameworks>
+        <LangVersion>10</LangVersion>
     </PropertyGroup>
 
     <ItemGroup>

@@ -1,4 +1,4 @@
-namespace DolfeMixin;
+namespace PatchExtensions;
 
 public static class Logger
 {

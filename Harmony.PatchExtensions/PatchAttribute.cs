@@ -1,7 +1,7 @@
 using System;
 using System.Reflection;
 
-namespace DolfeMixin 
+namespace PatchExtensions 
 {
     /// <summary>
     /// The injection point or strategy for applying a Mixin patch.
@@ -34,7 +34,7 @@ namespace DolfeMixin
     }
 
     /// <summary>
-    /// Makes patching easier :)
+    /// Declares a Harmony patch to be discovered and applied by <see cref="MixinLoader.ApplyPatches"/>.
     /// </summary>
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
     public class PatchAttribute : Attribute
@@ -99,6 +99,9 @@ namespace DolfeMixin
         /// Matches before this index are ignored.
         /// Use 0 to start from the first match.
         /// </param>
+        /// <exception cref="ArgumentException">
+        /// Thrown when <paramref name="methodName"/> cannot be found on <paramref name="type"/>.
+        /// </exception>
         public PatchAttribute(Type type, string methodName, AT at, string target = null, uint occurrence = 0, uint startIndex = 0, bool overwriting = false)
         {
             TargetMethod = type.GetMethod(methodName, 

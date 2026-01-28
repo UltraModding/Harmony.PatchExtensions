@@ -2,7 +2,8 @@ using System.Reflection;
 using System.Reflection.Emit;
 using HarmonyLib;
 
-namespace DolfeMixin;
+// ReSharper disable once CheckNamespace
+namespace PatchExtensions;
 
 public static class MixinLoader
 {
@@ -10,10 +11,19 @@ public static class MixinLoader
     {
         var assemblyName = new AssemblyName("DolfeMixinDynamicAssembly");
         var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
-        ModuleBuilder = assemblyBuilder.DefineDynamicModule("MixinWrappers");
+        _moduleBuilder = assemblyBuilder.DefineDynamicModule("MixinWrappers");
     }
     private class TranspilerConfig
     {
+        public TranspilerConfig(AT type, string targetMember, MethodInfo patchMethod, uint occurrence, uint startIndex)
+        {
+            Type = type;
+            TargetMember = targetMember;
+            PatchMethod = patchMethod;
+            Occurrence = occurrence;
+            StartIndex = startIndex;
+        }
+        
         public AT Type;
         public string TargetMember;
         public MethodInfo PatchMethod;
@@ -22,6 +32,14 @@ public static class MixinLoader
     }
     private class QueuedPatch // checking for conflicts
     {
+        public QueuedPatch(HarmonyMethod harmonyMethod, AT type, bool overwriting, MethodInfo patchMethod)
+        {
+            HarmonyMethod = harmonyMethod;
+            Type = type;
+            Overwriting = overwriting;
+            PatchMethod = patchMethod;
+        }
+        
         public HarmonyMethod HarmonyMethod;
         public AT Type;
         public bool Overwriting;
@@ -34,15 +52,25 @@ public static class MixinLoader
         SkipConflicts,
     }
 
-    private static ModuleBuilder ModuleBuilder;
+    private static ModuleBuilder _moduleBuilder;
     
     public static ConflictResolver ConflictResolutionMethod = ConflictResolver.Warn;
-    private static Dictionary<MethodBase, List<TranspilerConfig>> queuedTranspilers = new();
-    private static Dictionary<MethodInfo, List<QueuedPatch>> queuedPatches = new();
+    private static Dictionary<MethodBase, List<TranspilerConfig>> _queuedTranspilers = new();
+    private static Dictionary<MethodInfo, List<QueuedPatch>> _queuedPatches = new();
     
+    /// <summary>
+    /// Scans <paramref name="assembly"/> for methods decorated with <see cref="PatchAttribute"/>
+    /// and applies their Harmony patches to the configured targets.
+    /// </summary>
+    /// <param name="harmony">The Harmony instance used to apply patches.</param>
+    /// <param name="assembly">The assembly that contains patch methods.</param>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when <see cref="ConflictResolutionMethod"/> is set to <see cref="ConflictResolver.Error"/>
+    /// and conflicting patches or transpilers are detected.
+    /// </exception>
     public static void ApplyPatches(Harmony harmony, Assembly assembly)
     {
-        queuedTranspilers.Clear();
+        _queuedTranspilers.Clear();
 
         foreach (var type in assembly.GetTypes())
         {
@@ -51,6 +79,7 @@ public static class MixinLoader
                 var attrs = patchMethod.GetCustomAttributes<PatchAttribute>();
                 foreach (var attr in attrs)
                 {
+                    // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
                     if (attr.TargetMethod == null)
                     {
                         Logger.LogWarning($"You must set TargetMethod in {patchMethod.Name} for the Patch to work");
@@ -58,43 +87,41 @@ public static class MixinLoader
                     }
 
                     var harmonyMethod = new HarmonyMethod(patchMethod);
-                    QueuedPatch patch = new QueuedPatch
-                    {
-                        HarmonyMethod = harmonyMethod,
-                        Type = attr.At,
-                        Overwriting = attr.Overwriting,
-                        PatchMethod = patchMethod
-                    };
+                    QueuedPatch patch = new QueuedPatch(
+                        harmonyMethod: harmonyMethod,
+                        type: attr.At,
+                        overwriting: attr.Overwriting,
+                        patchMethod: patchMethod
+                    );
                     
                     if (attr.At == AT.HEAD) // prefix
                     {
-                        if (!queuedPatches.ContainsKey(attr.TargetMethod))
-                            queuedPatches[attr.TargetMethod] = new List<QueuedPatch>();
+                        if (!_queuedPatches.ContainsKey(attr.TargetMethod))
+                            _queuedPatches[attr.TargetMethod] = new List<QueuedPatch>();
                         
-                        queuedPatches[attr.TargetMethod].Add(patch);
-                        Logger.Log($"Applied head on {attr.TargetMethod.Name}");
+                        _queuedPatches[attr.TargetMethod].Add(patch);
+                        Logger.Log($"Queueing HEAD on {attr.TargetMethod.Name}");
                     }
                     else if (attr.At == AT.RETURN) // postfix
                     {
-                        if (!queuedPatches.ContainsKey(attr.TargetMethod))
-                            queuedPatches[attr.TargetMethod] = new List<QueuedPatch>();
+                        if (!_queuedPatches.ContainsKey(attr.TargetMethod))
+                            _queuedPatches[attr.TargetMethod] = new List<QueuedPatch>();
                         
-                        queuedPatches[attr.TargetMethod].Add(patch);
-                        Logger.Log($"Applied return on {attr.TargetMethod.Name}");
+                        _queuedPatches[attr.TargetMethod].Add(patch);
+                        Logger.Log($"Queueing RETURN on {attr.TargetMethod.Name}");
                     }
                     else if (attr.At == AT.INVOKE || attr.At == AT.REDIRECT) // before target / replace target
                     {
-                        if (!queuedTranspilers.ContainsKey(attr.TargetMethod))
-                            queuedTranspilers[attr.TargetMethod] = new List<TranspilerConfig>();
+                        if (!_queuedTranspilers.ContainsKey(attr.TargetMethod))
+                            _queuedTranspilers[attr.TargetMethod] = new List<TranspilerConfig>();
                         
-                        queuedTranspilers[attr.TargetMethod].Add(new TranspilerConfig
-                        {
-                            Type = attr.At,
-                            TargetMember = attr.TargetMember,
-                            PatchMethod = patchMethod,
-                            Occurrence = attr.Occurrence,
-                            StartIndex = attr.StartIndex
-                        });
+                        _queuedTranspilers[attr.TargetMethod].Add(new TranspilerConfig(
+                            type: attr.At,
+                            targetMember: attr.TargetMember,
+                            patchMethod: patchMethod,
+                            occurrence: attr.Occurrence,
+                            startIndex: attr.StartIndex)
+                        );
                     }
                 }
             }
@@ -102,17 +129,17 @@ public static class MixinLoader
 
         // Process patch conflicts
         var patchesToRemove = new HashSet<MethodInfo>();
-        DetectPatchConflicts(queuedPatches, patchesToRemove);
+        DetectPatchConflicts(_queuedPatches, patchesToRemove);
         foreach (var key in patchesToRemove)
-            queuedPatches.Remove(key);
+            _queuedPatches.Remove(key);
 
         // Process transpiler conflicts
         var transpilersToRemove = new HashSet<MethodBase>();
-        DetectTranspilerConflicts(queuedTranspilers, transpilersToRemove);
+        DetectTranspilerConflicts(_queuedTranspilers, transpilersToRemove);
         foreach (var key in transpilersToRemove)
-            queuedTranspilers.Remove(key);
+            _queuedTranspilers.Remove(key);
         
-        foreach (KeyValuePair<MethodInfo, List<QueuedPatch>> patch in queuedPatches)
+        foreach (KeyValuePair<MethodInfo, List<QueuedPatch>> patch in _queuedPatches)
         {
             foreach (QueuedPatch queuedPatch in patch.Value)
             {
@@ -128,18 +155,27 @@ public static class MixinLoader
                             }
                             
                             Logger.Log($"Using wrapper as the method returns: {queuedPatch.PatchMethod.ReturnType}");
-                            var wrapper = BoolLessPrefix(patch.Key, queuedPatch.PatchMethod);
+                            var wrapper = BoolLessPrefix(targetMethod: patch.Key, userPatchMethod: queuedPatch.PatchMethod);
+                            if (wrapper == null)
+                            {
+                                Logger.LogError($"Failed to create wrapper for {queuedPatch.PatchMethod.Name}");
+                                break;
+                            }
+                            Logger.Log(
+                                $"Applied HEAD (prefix) with wrapper on {patch.Key.Name} using {queuedPatch.HarmonyMethod.methodName}");
                             harmony.Patch(patch.Key, prefix: new HarmonyMethod(wrapper));
-                            Logger.Log($"Applied Auto-Return replacement on {patch.Key.Name}");
                         }
                         else
                         {
-                            Logger.Log($"Using normal harmony patch as it returns bool");
                             harmony.Patch(patch.Key, prefix: queuedPatch.HarmonyMethod);
+                            Logger.Log(
+                                $"Applied HEAD (prefix) on {patch.Key.Name} using {queuedPatch.HarmonyMethod.methodName}");
                         }
                         break;
                     case AT.RETURN:
                         harmony.Patch(patch.Key, postfix: queuedPatch.HarmonyMethod);
+                        Logger.Log(
+                            $"Applied RETURN (postfix) on {patch.Key.Name} using {queuedPatch.HarmonyMethod.methodName}");
                         break;
                     default:
                         throw new NotImplementedException($"Have not implemented: {queuedPatch.Type}");
@@ -148,7 +184,7 @@ public static class MixinLoader
         } 
         
         var transpiler = new HarmonyMethod(typeof(MixinLoader), nameof(TranspilerPiler));
-        foreach (var targetMethod in queuedTranspilers.Keys)
+        foreach (var targetMethod in _queuedTranspilers.Keys)
         {
             try
             {
@@ -202,20 +238,20 @@ public static class MixinLoader
     }
     private static void LogConflict(MethodBase targetMethod, IEnumerable<MethodInfo> patchMethods)
     {
-        Logger.LogWarning($"Multiple patches queued for {targetMethod.DeclaringType.FullName}.{targetMethod.Name}");
+        Logger.LogWarning($"Multiple patches queued for {targetMethod.DeclaringType?.FullName}.{targetMethod.Name}");
     
         foreach (var method in patchMethods)
         {
             var parameters = string.Join(", ", method.GetParameters()
                 .Select(p => $"{p.ParameterType.Name} {p.Name}" + 
                              (p.HasDefaultValue ? $" = {p.DefaultValue}" : "")));
-            Logger.LogWarning($"  - {method.DeclaringType.FullName}.{method.Name}({parameters})");
+            Logger.LogWarning($"  - {method.DeclaringType?.FullName}.{method.Name}({parameters})");
         }
     }
     
     public static IEnumerable<CodeInstruction> TranspilerPiler(IEnumerable<CodeInstruction> instructions, MethodBase original)
     {
-        if (!queuedTranspilers.TryGetValue(original, out var transpilerConfigs))
+        if (!_queuedTranspilers.TryGetValue(original, out var transpilerConfigs))
             return instructions;
 
         var matcher = new CodeMatcher(instructions);
@@ -223,7 +259,7 @@ public static class MixinLoader
         {
             matcher.Start();
             
-            string requiredClass = null;
+            string requiredClass = "";
             string requiredMethod = config.TargetMember;
             // for Class.Method
             if (requiredMethod.Contains(".")) // C#
@@ -290,20 +326,20 @@ public static class MixinLoader
         return matcher.InstructionEnumeration();
     }
 
-    private static MethodInfo BoolLessPrefix(MethodInfo original, MethodInfo userPatch)
+    private static MethodInfo? BoolLessPrefix(MethodInfo targetMethod, MethodInfo userPatchMethod)
     {
-        var typeName = $"MixinWrapper_{userPatch.Name}_{Guid.NewGuid():N}";
-        var typeBuilder = ModuleBuilder.DefineType(typeName, TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Abstract);
+        var typeName = $"MixinWrapper_{userPatchMethod.Name}_{Guid.NewGuid():N}";
+        var typeBuilder = _moduleBuilder.DefineType(typeName, TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Abstract);
 
         // Adds Params: User Args + ref __result
-        var userParams = userPatch.GetParameters();
-        var originalReturnType = original.ReturnType;
+        var userParams = userPatchMethod.GetParameters();
+        var originalReturnType = targetMethod.ReturnType;
 
         var wrapperParamTypes = userParams.Select(p => p.ParameterType).ToList();
         wrapperParamTypes.Add(originalReturnType.MakeByRefType()); // add ref Type __result
 
         var methodBuilder = typeBuilder.DefineMethod(
-            $"Wrapper_{userPatch.Name}",
+            $"Wrapper_{userPatchMethod.Name}",
             MethodAttributes.Public | MethodAttributes.Static,
             typeof(bool), // return bool for harmony
             wrapperParamTypes.ToArray()
@@ -313,26 +349,34 @@ public static class MixinLoader
         {
             methodBuilder.DefineParameter(i + 1, ParameterAttributes.None, userParams[i].Name);
         }
-        methodBuilder.DefineParameter(userParams.Length + 1, ParameterAttributes.Out, "__result"); // add __result at end
+        methodBuilder.DefineParameter(userParams.Length + 1, ParameterAttributes.Out, "__result"); // add __result at the end
 
         ILGenerator il = methodBuilder.GetILGenerator();
 
         LoadArg(il, userParams.Length); // load __result
-        for (int i = 0; i < userParams.Length; i++) // load userags
+        for (int i = 0; i < userParams.Length; i++) // load userAgs
         {
             LoadArg(il, i);
         }
 
-        il.Emit(OpCodes.Call, userPatch); // call user patch
+        il.Emit(OpCodes.Call, userPatchMethod); // call user patch
 
         il.Emit(OpCodes.Stobj, originalReturnType); // store result into __result
 
-        // E. Return false (skip original)
         il.Emit(OpCodes.Ldc_I4_0); // set false (0)
         il.Emit(OpCodes.Ret); // return
+        
+        var builtType = CreateType(typeBuilder); // make type
+        return builtType.GetMethod($"Wrapper_{userPatchMethod.Name}");
+    }
 
-        var builtType = typeBuilder.CreateType(); // make type
-        return builtType.GetMethod($"Wrapper_{userPatch.Name}");
+    private static Type CreateType(TypeBuilder typeBuilder)
+    {
+#if NETSTANDARD2_0 || NETSTANDARD2_1
+        return typeBuilder.CreateTypeInfo()!.AsType();
+#else
+        return typeBuilder.CreateType()!;
+#endif
     }
 
     private static void LoadArg(ILGenerator il, int index)
