@@ -4,6 +4,14 @@
         <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <Title>Harmony Patch Extensions</Title>
+        <Description>An extension to Harmony aiming to create a Mixin like patching system via attributes</Description>
+        <PackageProjectUrl>https://github.com/UltraModding/Harmony.PatchExtensions/tree/master</PackageProjectUrl>
+        <PackageLicenseUrl>Apache-2.0</PackageLicenseUrl>
+        <RepositoryUrl>https://github.com/UltraModding/Harmony.PatchExtensions/tree/master</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageTags>csharp, dotnet, harmony, harmonylib, reflection, library, patching</PackageTags>
     </PropertyGroup>
 
     <ItemGroup>
