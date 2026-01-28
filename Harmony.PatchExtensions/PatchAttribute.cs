@@ -1,7 +1,7 @@
 using System;
 using System.Reflection;
 
-namespace PatchExtensions 
+namespace HarmonyLib.PatchExtensions 
 {
     /// <summary>
     /// The injection point or strategy for applying a Mixin patch.

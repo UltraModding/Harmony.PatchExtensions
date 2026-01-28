@@ -1,4 +1,4 @@
-namespace PatchExtensions;
+namespace HarmonyLib.PatchExtensions;
 
 public static class Logger
 {

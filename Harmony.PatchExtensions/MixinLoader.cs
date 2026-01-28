@@ -3,7 +3,7 @@ using System.Reflection.Emit;
 using HarmonyLib;
 
 // ReSharper disable once CheckNamespace
-namespace PatchExtensions;
+namespace HarmonyLib.PatchExtensions;
 
 public static class MixinLoader
 {
@@ -68,12 +68,34 @@ public static class MixinLoader
     /// Thrown when <see cref="ConflictResolutionMethod"/> is set to <see cref="ConflictResolver.Error"/>
     /// and conflicting patches or transpilers are detected.
     /// </exception>
-    public static void ApplyPatches(Harmony harmony, Assembly assembly)
+    public static void ApplyPatches(HarmonyLib.Harmony harmony, Assembly assembly)
+    {
+        ApplyPatches(harmony, assembly, Array.Empty<Type>());
+    }
+    
+    /// <summary>
+    /// Applying patches for a single type, used in testing
+    /// Can also be used like MixinLoader.ApplyPatches(harmony, assembly, typeof(PatchClass)) to only patch using a single class
+    /// </summary>
+    /// <param name="harmony">The Harmony instance used to apply patches.</param>
+    /// <param name="assembly">The assembly that contains patch methods.</param>
+    /// <param name="patchTypes">Types containing patch methods to apply. If empty, all types in the assembly are done.</param>
+    public static void ApplyPatches(HarmonyLib.Harmony harmony, Assembly assembly, params Type[] patchTypes)
+    {
+        HashSet<Type>? allowedTypes = patchTypes.Length == 0 ? null : new HashSet<Type>(patchTypes);
+        ApplyPatches(harmony, assembly, allowedTypes);
+    }
+
+    private static void ApplyPatches(HarmonyLib.Harmony harmony, Assembly assembly, HashSet<Type>? allowedTypes)
     {
         _queuedTranspilers.Clear();
+        _queuedPatches.Clear();
 
         foreach (var type in assembly.GetTypes())
         {
+            if (allowedTypes != null && !allowedTypes.Contains(type))
+                continue;
+
             foreach (var patchMethod in type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
             {
                 var attrs = patchMethod.GetCustomAttributes<PatchAttribute>();
@@ -197,7 +219,7 @@ public static class MixinLoader
             }
         }
     }
-
+    
     private static void DetectPatchConflicts(
         Dictionary<MethodInfo, List<QueuedPatch>> patches,
         HashSet<MethodInfo> toRemove)

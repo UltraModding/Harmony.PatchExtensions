@@ -18,6 +18,17 @@
         <LangVersion>10</LangVersion>
     </PropertyGroup>
 
+    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+      <DebugType>portable</DebugType>
+      <DocumentationFile>bin\Debug\Harmony.PatchExtensions.xml</DocumentationFile>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+      <DebugSymbols>true</DebugSymbols>
+      <DebugType>portable</DebugType>
+      <DocumentationFile>bin\Release\Harmony.PatchExtensions.xml</DocumentationFile>
+    </PropertyGroup>
+
     <ItemGroup>
       <PackageReference Include="HarmonyX" Version="2.16.0" />
     </ItemGroup>
