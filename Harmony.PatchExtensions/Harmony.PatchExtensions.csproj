@@ -6,8 +6,11 @@
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <Title>Harmony Patch Extensions</Title>
         <Description>An extension to Harmony aiming to create a Mixin like patching system via attributes</Description>
+        <Authors>DolfeLive</Authors>
+        <Version>1.0.0</Version>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageProjectUrl>https://github.com/UltraModding/Harmony.PatchExtensions/tree/master</PackageProjectUrl>
-        <PackageLicenseUrl>Apache-2.0</PackageLicenseUrl>
+        <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
         <RepositoryUrl>https://github.com/UltraModding/Harmony.PatchExtensions/tree/master</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
         <PackageTags>csharp, dotnet, harmony, harmonylib, reflection, library, patching</PackageTags>
@@ -17,6 +20,11 @@
 
     <ItemGroup>
       <PackageReference Include="HarmonyX" Version="2.16.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Include="..\README.md" Pack="true" PackagePath="" />
+      <None Include="..\LICENSE.md" Pack="true" PackagePath="" />
     </ItemGroup>
 
 </Project>
