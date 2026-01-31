@@ -32,6 +32,7 @@ public class RETURNTests : IDisposable
         PatchingTargets.PatchingHelper.Reset();
     }
     
+    /// <inheritdoc />
     public void Dispose()
     {
         _harmony.UnpatchSelf();

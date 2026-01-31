@@ -33,6 +33,7 @@ public class REDIRECTTests : IDisposable
         PatchingTargets.PatchingHelper.Reset();
     }
 
+    /// <inheritdoc />
     public void Dispose()
     {
         _harmony.UnpatchSelf();

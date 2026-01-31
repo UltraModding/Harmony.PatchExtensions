@@ -65,6 +65,7 @@ public class HEADTests : IDisposable
         PatchingTargets.PatchingHelper.Reset();
     }
     
+    /// <inheritdoc />
     public void Dispose()
     {
         _harmony.UnpatchSelf();

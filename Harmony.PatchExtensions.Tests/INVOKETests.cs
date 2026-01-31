@@ -33,6 +33,7 @@ public class INVOKETests : IDisposable
         PatchingTargets.PatchingHelper.Reset();
     }
     
+    /// <inheritdoc />
     public void Dispose()
     {
         _harmony.UnpatchSelf();

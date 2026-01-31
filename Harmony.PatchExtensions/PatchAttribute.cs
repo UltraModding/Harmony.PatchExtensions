@@ -31,6 +31,14 @@ namespace HarmonyLib.PatchExtensions
         /// You can also specify <see cref="PatchAttribute.Occurrence"/> to choose a specific occurrence
         /// </summary>
         REDIRECT,
+
+        
+        /// <summary>
+        /// Inserts code at the specified location in the target method.
+        /// You need to <see cref=""/>
+        /// </summary>
+        [Obsolete("Not yet implemented")]
+        INSERT,
     }
 
     /// <summary>
