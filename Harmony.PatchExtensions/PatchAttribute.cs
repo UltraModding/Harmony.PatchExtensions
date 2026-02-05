@@ -22,6 +22,7 @@ namespace HarmonyLib.PatchExtensions
         /// <summary>
         /// <b>Injects</b> code before the method call in the target method. <br/>
         /// You must specify <see cref="PatchAttribute.TargetMember"/> to choose which call to target.
+        /// You can also specify <see cref="PatchAttribute.Occurrence"/> to choose a specific occurrence
         /// </summary>
         INVOKE,
 
@@ -31,7 +32,13 @@ namespace HarmonyLib.PatchExtensions
         /// You can also specify <see cref="PatchAttribute.Occurrence"/> to choose a specific occurrence
         /// </summary>
         REDIRECT,
-
+        
+        /// <summary>
+        /// <b>Injects</b> code after the method call in the target method. <br/>
+        /// You must specify <see cref="PatchAttribute.TargetMember"/> to choose which call to target.
+        /// You can also specify <see cref="PatchAttribute.Occurrence"/> to choose a specific occurrence
+        /// </summary>
+        AFTER,
         
         /// <summary>
         /// Inserts code at the specified location in the target method.

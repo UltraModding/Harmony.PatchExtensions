@@ -7,7 +7,7 @@
         <Title>Harmony Patch Extensions</Title>
         <Description>An extension to Harmony aiming to create a Mixin like patching system via attributes</Description>
         <Authors>DolfeLive</Authors>
-        <Version>1.0.0</Version>
+        <Version>1.1.0</Version>
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageProjectUrl>https://github.com/UltraModding/Harmony.PatchExtensions/tree/master</PackageProjectUrl>
         <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
@@ -31,6 +31,7 @@
 
     <ItemGroup>
       <PackageReference Include="HarmonyX" Version="2.16.0" />
+      <PackageReference Include="MonoMod.Backports" Version="1.1.2" />
     </ItemGroup>
 
     <ItemGroup>

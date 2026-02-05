@@ -153,7 +153,7 @@ public static class MixinLoader
                         _queuedPatches[attr.TargetMethod].Add(patch);
                         Logger.Log($"Queueing RETURN on {attr.TargetMethod.Name}");
                     }
-                    else if (attr.At == AT.INVOKE || attr.At == AT.REDIRECT) // before target / replace target
+                    else if (attr.At == AT.INVOKE || attr.At == AT.REDIRECT || attr.At == AT.AFTER) // before target / replace target / or after
                     {
                         if (!_queuedTranspilers.ContainsKey(attr.TargetMethod))
                             _queuedTranspilers[attr.TargetMethod] = new List<TranspilerConfig>();
@@ -175,14 +175,14 @@ public static class MixinLoader
         PatchExtensions.ConflictResolver.DetectPatchConflicts(_queuedPatches, patchesToRemove);
         foreach (var key in patchesToRemove)
             _queuedPatches.Remove(key);
-
+        
         // Process transpiler conflicts
         var transpilersToRemove = new HashSet<MethodBase>();
         PatchExtensions.ConflictResolver.DetectTranspilerConflicts(_queuedTranspilers, transpilersToRemove);
         foreach (var key in transpilersToRemove)
             _queuedTranspilers.Remove(key);
         
-                
+        
         MixinApplier.ApplyPatches(_queuedPatches, harmony, _moduleBuilder);
         
         var transpiler = new HarmonyMethod(typeof(MixinLoader), nameof(TranspilerPiler));
@@ -200,12 +200,12 @@ public static class MixinLoader
         }
     }
     
-    private static IEnumerable<CodeInstruction> TranspilerPiler(IEnumerable<CodeInstruction> instructions, MethodBase original)
+    private static IEnumerable<CodeInstruction> TranspilerPiler(IEnumerable<CodeInstruction> instructions, MethodBase original, ILGenerator generator)
     {
         if (!_queuedTranspilers.TryGetValue(original, out var transpilerConfigs))
             return instructions;
 
-        var matcher = new CodeMatcher(instructions);
+        var matcher = new CodeMatcher(instructions, generator);
         foreach (var config in transpilerConfigs)
         {
             matcher.Start();
@@ -233,19 +233,38 @@ public static class MixinLoader
                 matcher.MatchForward(false, 
                     new CodeMatch(instruction => 
                     {
-                        if (instruction.opcode != OpCodes.Call && instruction.opcode != OpCodes.Callvirt) return false;
-                        if (!(instruction.operand is MethodInfo methodInfo)) return false;
-
-                        // Method Name
-                        if (methodInfo.Name != requiredMethod) return false;
-
-                        // Class Name
-                        if (!string.IsNullOrEmpty(requiredClass))
+                        bool isMethod = instruction.opcode == OpCodes.Call 
+                                        || instruction.opcode == OpCodes.Callvirt 
+                                        || instruction.opcode == OpCodes.Newobj;
+                        bool isField  = instruction.opcode == OpCodes.Stfld 
+                                        || instruction.opcode == OpCodes.Ldfld 
+                                        || instruction.opcode == OpCodes.Ldsfld 
+                                        || instruction.opcode == OpCodes.Stsfld 
+                                        || instruction.opcode == OpCodes.Ldflda 
+                                        || instruction.opcode == OpCodes.Ldsflda;
+                        
+                        if (!isMethod && !isField) return false;
+                        
+                        string member; // in 'callvirt Class::Method' it would be 'Method'
+                        string? declaring; // in 'callvirt Class::Method' it would be 'Class'
+                        
+                        if (isMethod && instruction.operand is MethodInfo m)
                         {
-                            if (methodInfo.DeclaringType == null || methodInfo.DeclaringType.Name != requiredClass)
-                                return false;
+                            member = m.Name;
+                            declaring = m.DeclaringType?.Name;
                         }
-
+                        else if (isField && instruction.operand is FieldInfo f)
+                        {
+                            member = f.Name;
+                            declaring = f.DeclaringType?.Name;
+                        }
+                        else return false;
+                        
+                        if (member != requiredMethod) return false;
+                        
+                        if (!string.IsNullOrEmpty(requiredClass) && declaring != requiredClass)
+                            return false;
+                        
                         return true;
                     })
                 );
@@ -265,7 +284,38 @@ public static class MixinLoader
                             matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Call, config.PatchMethod));
                         else if (config.Type == AT.REDIRECT)
                             matcher.SetInstruction(new CodeInstruction(OpCodes.Call, config.PatchMethod));
+                        else if (config.Type == AT.AFTER)
+                        {
+                            // because calling another method (the user's patch) will lose the return value the stack has to be saved and restored after
+                            var targetIns = matcher.Instruction;
+                            bool hasReturnValue = false;
+                            Type? returnType = null;
 
+                            if (targetIns.operand is MethodInfo targetMethod)
+                            {
+                                hasReturnValue = targetMethod.ReturnType != typeof(void);
+                                returnType = targetMethod.ReturnType;
+                            }
+
+                            matcher.Advance(1);
+
+                            if (hasReturnValue && returnType != null)
+                            {
+                                var tempLocal = generator.DeclareLocal(returnType);
+
+                                matcher.Insert(
+                                    new CodeInstruction(OpCodes.Stloc, tempLocal),  // store return val
+                                    new CodeInstruction(OpCodes.Call, config.PatchMethod),  // call patch
+                                    new CodeInstruction(OpCodes.Ldloc, tempLocal)   // restore return val
+                                );
+                                matcher.Advance(3);
+                            }
+                            else // no need for all that stuff if its void or returns null
+                            {
+                                matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Call, config.PatchMethod));
+                            }
+                        }
+                        
                         if (config.Occurrence != 0) break;
                     }
                 }
