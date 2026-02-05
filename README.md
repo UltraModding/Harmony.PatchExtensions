@@ -4,10 +4,11 @@ Attribute based extensions for Harmony that lets you define mixin style patches.
 
 ## Features
 - Attribute based patches
-- Injection points: HEAD (prefix), RETURN (postfix), INVOKE (insert before call), REDIRECT (replace call)
+- Injection points: HEAD (prefix), RETURN (postfix), INVOKE (insert before call), REDIRECT (replace call), AFTER (after call)
 - Occurrence and start-index targeting
 - Conflict detection
-- Optional wrapper for overwrite prefixes that return the target's return type
+- Optional wrapper for overwriting prefixes that return the target's return type
+- Patching variable declarations in methods 
 
 ## Install
 Use one of the following:
@@ -18,7 +19,7 @@ Use one of the following:
 ```csharp
 using System.Reflection;
 using HarmonyLib;
-using PatchExtensions;
+using HarmonyLib.PatchExtensions;
 
 public static class Program
 {
@@ -36,7 +37,7 @@ public static class Program
 
 ### HEAD (prefix)
 ```csharp
-using PatchExtensions;
+using HarmonyLib.PatchExtensions;
 
 public class Target
 {
@@ -56,7 +57,7 @@ public static class Patches
 ### HEAD overwrite (skip original)
 If `overwriting: true`, the patch can return `bool` (Harmony style) or the same return type as the target.
 ```csharp
-using PatchExtensions;
+using HarmonyLib.PatchExtensions;
 
 public static class OverwritePatches
 {
@@ -70,7 +71,7 @@ public static class OverwritePatches
 
 ### RETURN (postfix)
 ```csharp
-using PatchExtensions;
+using HarmonyLib.PatchExtensions;
 
 public static class ReturnPatches
 {
@@ -84,7 +85,7 @@ public static class ReturnPatches
 
 ### INVOKE (insert before call)
 ```csharp
-using PatchExtensions;
+using HarmonyLib.PatchExtensions;
 
 public class TargetCalls
 {
@@ -107,7 +108,7 @@ public static class InvokePatches
 
 ### REDIRECT (replace call)
 ```csharp
-using PatchExtensions;
+using HarmonyLib.PatchExtensions;
 
 public static class RedirectPatches
 {
@@ -115,6 +116,20 @@ public static class RedirectPatches
     private static void ReplaceCall()
     {
         // Replaces Helper.DoThing with this method
+    }
+}
+```
+
+### AFTER (after call)
+```csharp
+using HarmonyLib.PatchExtensions;
+
+public static class RedirectPatches
+{
+    [Patch(typeof(TargetCalls), "Foo", AT.AFTER, target: "Helper.DoThing")]
+    private static void AfterCall()
+    {
+        // Puts code after call
     }
 }
 ```
