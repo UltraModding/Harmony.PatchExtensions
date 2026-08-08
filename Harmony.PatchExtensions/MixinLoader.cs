@@ -203,11 +203,15 @@ public static class MixinLoader
     {
         if (!_queuedTranspilers.TryGetValue(original, out var transpilerConfigs))
             return instructions;
-
+        
         var matcher = new CodeMatcher(instructions, generator);
+        
         foreach (var config in transpilerConfigs)
         {
             matcher.Start();
+            
+            int currentOccurrence = 0; // for the occurrence
+            int relativeOccurrence = 0; //
             
             string requiredClass = "";
             string requiredMethod = config.TargetMember;
@@ -225,15 +229,15 @@ public static class MixinLoader
                 requiredMethod = parts[1];
             }
             
-            int currentOccurrence = 0; // for the occurrence
-            int relativeOccurrence = 0; //
             while (true)
             {
                 matcher.MatchForward(false, 
                     new CodeMatch(instruction =>
                     {
-                        if (instruction.opcode == OpCodes.Ret)
+                        if (config.Type == AT.RETURN && instruction.opcode == OpCodes.Ret)
                             return true;
+                        else if (config.Type == AT.RETURN)
+                            return false;
                         
                         bool isMethod = instruction.opcode == OpCodes.Call 
                                         || instruction.opcode == OpCodes.Callvirt 
@@ -350,12 +354,6 @@ public static class MixinLoader
                                 );
                                 matcher.Advance(3);
                             }
-                            else
-                            {
-                                matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Call, config.PatchMethod));
-                            }
-                            
-                            matcher.Advance(1);
                         }
                         
                         if (config.Occurrence != 0) break;
@@ -363,6 +361,7 @@ public static class MixinLoader
                 }
 
                 matcher.Advance(1);
+            
             }
         }
         

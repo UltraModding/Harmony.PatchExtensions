@@ -1,14 +1,14 @@
 namespace HarmonyLib.PatchExtensions.Tests;
 
-public class RETURNTests : IDisposable
+public class POSTFIXTests : IDisposable
 {
     private readonly Harmony _harmony;
 
-    public RETURNTests()
+    public POSTFIXTests()
     {
         _harmony = new Harmony("tests.patchextensions.return");
         MixinLoader.ConflictResolutionMethod = MixinLoader.ConflictResolver.Error;
-        MixinLoader.ApplyPatches(_harmony, typeof(RETURNTests).Assembly, typeof(ReturnPatches));
+        MixinLoader.ApplyPatches(_harmony, typeof(POSTFIXTests).Assembly, typeof(ReturnPatches));
     }
 
     /// <summary>
@@ -41,7 +41,7 @@ public class RETURNTests : IDisposable
 
 public static class ReturnPatches
 {
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.Add), AT.RETURN)]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.Add), AT.POSTFIX)]
     public static void AddPostfix(ref int __result)
     {
         __result += 1;
