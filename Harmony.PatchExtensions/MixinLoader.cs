@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.Emit;
 
@@ -9,6 +10,11 @@ namespace HarmonyLib.PatchExtensions;
 /// </summary>
 public static class MixinLoader
 {
+    /// <summary>
+    /// The latest version of Harmony.PatchExtensions that causes inconsistencies between new and old versions
+    /// </summary>
+    public static Version LatestBreakingVersion { get; } = new Version(1, 2, 0);
+    
     static MixinLoader()
     {
         var assemblyName = new AssemblyName("DolfeMixinDynamicAssembly");
@@ -16,38 +22,6 @@ public static class MixinLoader
         _moduleBuilder = assemblyBuilder.DefineDynamicModule("MixinWrappers");
     }
     
-    internal class TranspilerConfig
-    {
-        public TranspilerConfig(AT type, string targetMember, MethodInfo patchMethod, uint occurrence, uint startIndex)
-        {
-            Type = type;
-            TargetMember = targetMember;
-            PatchMethod = patchMethod;
-            Occurrence = occurrence;
-            StartIndex = startIndex;
-        }
-        
-        public AT Type;
-        public string TargetMember;
-        public MethodInfo PatchMethod;
-        public uint Occurrence;
-        public uint StartIndex;
-    }
-    internal class QueuedPatch // for checking for conflicts
-    {
-        public QueuedPatch(HarmonyMethod harmonyMethod, AT type, bool overwriting, MethodInfo patchMethod)
-        {
-            HarmonyMethod = harmonyMethod;
-            Type = type;
-            Overwriting = overwriting;
-            PatchMethod = patchMethod;
-        }
-        
-        public HarmonyMethod HarmonyMethod;
-        public AT Type;
-        public bool Overwriting;
-        public MethodInfo PatchMethod;
-    }
     /// <summary>
     /// Defines how conflicts between patches should be resolved when multiple patches target the same method.
     /// </summary>
@@ -91,6 +65,7 @@ public static class MixinLoader
     /// </exception>
     public static void ApplyPatches(Harmony harmony, Assembly assembly)
     {
+        WarnOutOfDate();
         ApplyPatches(harmony, assembly, Array.Empty<Type>());
     }
     
@@ -103,10 +78,28 @@ public static class MixinLoader
     /// <param name="patchTypes">Types containing patch methods to apply. If empty, all types in the assembly are done.</param>
     public static void ApplyPatches(Harmony harmony, Assembly assembly, params Type[] patchTypes)
     {
+        WarnOutOfDate();
         HashSet<Type>? allowedTypes = patchTypes.Length == 0 ? null : new HashSet<Type>(patchTypes);
         ApplyPatches(harmony, assembly, allowedTypes);
     }
-
+    
+    private static void WarnOutOfDate()
+    {
+        var stackFrame = new StackTrace().GetFrame(2); // 0 this, 1 ApplyPatches, 2 caller
+        var callerAssembly = stackFrame?.GetMethod()?.Module.Assembly ?? null;
+        
+        if (callerAssembly == null)
+            return;
+        
+        var refUtil = callerAssembly.GetReferencedAssemblies()
+            .FirstOrDefault(a => a.Name == Assembly.GetExecutingAssembly().GetName().Name);
+        
+        if (refUtil != null && refUtil.Version < LatestBreakingVersion)
+        {
+            Logger.LogError($"{callerAssembly.FullName} is using an outdated version of Harmony.PatchExtensions ({refUtil.Version}), a breaking update has been introduced since then ({LatestBreakingVersion})");
+        }
+    }
+    
     private static void ApplyPatches(Harmony harmony, Assembly assembly, HashSet<Type>? allowedTypes)
     {
         _queuedTranspilers.Clear();
@@ -145,16 +138,22 @@ public static class MixinLoader
                         _queuedPatches[attr.TargetMethod].Add(patch);
                         Logger.Log($"Queueing HEAD on {attr.TargetMethod.Name}");
                     }
-                    else if (attr.At == AT.RETURN) // postfix
+                    else if (attr.At == AT.POSTFIX) // postfix
                     {
                         if (!_queuedPatches.ContainsKey(attr.TargetMethod))
                             _queuedPatches[attr.TargetMethod] = new List<QueuedPatch>();
                         
                         _queuedPatches[attr.TargetMethod].Add(patch);
-                        Logger.Log($"Queueing RETURN on {attr.TargetMethod.Name}");
+                        Logger.Log($"Queueing POSTFIX on {attr.TargetMethod.Name}");
                     }
-                    else if (attr.At == AT.INVOKE || attr.At == AT.REDIRECT || attr.At == AT.AFTER) // before target / replace target / or after
+                    else if (attr.At == AT.INVOKE || attr.At == AT.REDIRECT || attr.At == AT.AFTER || attr.At == AT.RETURN) // before target / replace target / or after
                     {
+                        if (string.IsNullOrEmpty(attr.TargetMember))
+                        {
+                            Logger.LogWarning($"You must set 'target' in {patchMethod.Name} when using AT.{attr.At}");
+                            continue;
+                        }
+                        
                         if (!_queuedTranspilers.ContainsKey(attr.TargetMethod))
                             _queuedTranspilers[attr.TargetMethod] = new List<TranspilerConfig>();
                         
@@ -213,7 +212,7 @@ public static class MixinLoader
             string requiredClass = "";
             string requiredMethod = config.TargetMember;
             // for Class.Method
-            if (requiredMethod.Contains(".")) // C#
+            if (requiredMethod.Contains('.')) // C#
             {
                 var parts = requiredMethod.Split('.');
                 requiredClass = parts[0];
@@ -231,8 +230,11 @@ public static class MixinLoader
             while (true)
             {
                 matcher.MatchForward(false, 
-                    new CodeMatch(instruction => 
+                    new CodeMatch(instruction =>
                     {
+                        if (instruction.opcode == OpCodes.Ret)
+                            return true;
+                        
                         bool isMethod = instruction.opcode == OpCodes.Call 
                                         || instruction.opcode == OpCodes.Callvirt 
                                         || instruction.opcode == OpCodes.Newobj;
@@ -269,8 +271,9 @@ public static class MixinLoader
                     })
                 );
 
-                if (matcher.IsInvalid) break;
-
+                if (matcher.IsInvalid)
+                    break;
+                
                 currentOccurrence++;
                 if (config.StartIndex == 0 || currentOccurrence >= config.StartIndex)
                 {
@@ -283,7 +286,25 @@ public static class MixinLoader
                         if (config.Type == AT.INVOKE)
                             matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Call, config.PatchMethod));
                         else if (config.Type == AT.REDIRECT)
+                        {
+                            var targetInstruction = matcher.Instruction;
+                            
+                            if (targetInstruction.operand is not MethodBase originalMethod)
+                            {
+                                Logger.LogWarning($"REDIRECT target '{config.TargetMember}' is a field, not a method. Skipped.");
+                                matcher.Advance(1);
+                                continue;
+                            }
+                            
+                            if (!DontScrewUpStack(originalMethod, targetInstruction.opcode, config.PatchMethod))
+                            {
+                                Logger.LogWarning($"REDIRECT patch '{config.PatchMethod.Name}' doesn't match with '{config.TargetMember}'. Skipped.");
+                                matcher.Advance(1);
+                                continue;
+                            }
+                            
                             matcher.SetInstruction(new CodeInstruction(OpCodes.Call, config.PatchMethod));
+                        }
                         else if (config.Type == AT.AFTER)
                         {
                             // because calling another method (the user's patch) will lose the return value the stack has to be saved and restored after
@@ -315,6 +336,27 @@ public static class MixinLoader
                                 matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Call, config.PatchMethod));
                             }
                         }
+                        else if (config.Type == AT.RETURN)
+                        {
+                            bool returns = original is MethodInfo mi && mi.ReturnType != typeof(void);
+                            
+                            if (returns)
+                            {
+                                var tempLocal = generator.DeclareLocal(((MethodInfo)original).ReturnType);
+                                matcher.Insert(
+                                    new CodeInstruction(OpCodes.Stloc, tempLocal),
+                                    new CodeInstruction(OpCodes.Call, config.PatchMethod),
+                                    new CodeInstruction(OpCodes.Ldloc, tempLocal)
+                                );
+                                matcher.Advance(3);
+                            }
+                            else
+                            {
+                                matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Call, config.PatchMethod));
+                            }
+                            
+                            matcher.Advance(1);
+                        }
                         
                         if (config.Occurrence != 0) break;
                     }
@@ -325,5 +367,28 @@ public static class MixinLoader
         }
         
         return matcher.InstructionEnumeration();
+    }
+    
+    private static bool DontScrewUpStack(MethodBase originalMethod, OpCode opCode, MethodInfo patchMethod)
+    {
+        var expectedParams = originalMethod.GetParameters().Select(p => p.ParameterType).ToList();
+        
+        // if it is calling an instance
+        if (opCode != OpCodes.Newobj && !originalMethod.IsStatic)
+            expectedParams.Insert(0, originalMethod.DeclaringType!);
+        
+        var patchParams = patchMethod.GetParameters().Select(p => p.ParameterType).ToList();
+        
+        if (expectedParams.Count != patchParams.Count)
+            return false;
+        
+        for (int i = 0; i < expectedParams.Count; i++)
+        {
+            if (!expectedParams[i].IsAssignableFrom(patchParams[i]))
+                return false;
+        }
+        
+        Type expectedReturn = originalMethod is MethodInfo mi ? mi.ReturnType : originalMethod.DeclaringType!;
+        return patchMethod.ReturnType == expectedReturn;
     }
 }

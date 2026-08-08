@@ -15,12 +15,17 @@ namespace HarmonyLib.PatchExtensions
         HEAD,
 
         /// <summary>
-        /// <b>Harmony Postfix</b>.<br/>
+        /// Injects code at every return in a method
         /// </summary>
         RETURN,
-
+        
         /// <summary>
-        /// <b>Injects</b> code before the method call in the target method. <br/>
+        /// <b>Harmony Postfix</b>.
+        /// </summary>
+        POSTFIX,
+        
+        /// <summary>
+        /// <b>Injects</b> code <b>before</b> the method call in the target method. <br/>
         /// You must specify <see cref="PatchAttribute.TargetMember"/> to choose which call to target.
         /// You can also specify <see cref="PatchAttribute.Occurrence"/> to choose a specific occurrence
         /// </summary>
@@ -34,7 +39,7 @@ namespace HarmonyLib.PatchExtensions
         REDIRECT,
         
         /// <summary>
-        /// <b>Injects</b> code after the method call in the target method. <br/>
+        /// <b>Injects</b> code <b>after</b> the method call in the target method. <br/>
         /// You must specify <see cref="PatchAttribute.TargetMember"/> to choose which call to target.
         /// You can also specify <see cref="PatchAttribute.Occurrence"/> to choose a specific occurrence
         /// </summary>

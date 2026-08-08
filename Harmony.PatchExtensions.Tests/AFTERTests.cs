@@ -74,7 +74,7 @@ public class AFTERTests : IDisposable
         Assert.Equal(2, PatchingTargets.PatchingHelper.NothinCalls);
         Assert.Equal(1, PatchingTargets.CallCounter.AddCalls3);
     }
-
+    
     /// <summary>
     /// injects after Bar when its return value is stored and then passed to Foo
     /// so foo and the downstream call remain correct

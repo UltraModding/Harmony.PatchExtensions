@@ -12,12 +12,12 @@ internal static class MixinApplier
     /// <param name="harmony">Harmony instance for applying patches.</param>
     /// <param name="_moduleBuilder">Module builder for creating dynamic types.</param>
     /// <exception cref="NotImplementedException">Thrown if a patch type is not supported.</exception>
-    public static void ApplyPatches(Dictionary<MethodInfo, List<MixinLoader.QueuedPatch>> _queuedPatches, Harmony harmony, ModuleBuilder _moduleBuilder)
+    public static void ApplyPatches(Dictionary<MethodInfo, List<QueuedPatch>> _queuedPatches, Harmony harmony, ModuleBuilder _moduleBuilder)
     {
-        foreach (KeyValuePair<MethodInfo, List<MixinLoader.QueuedPatch>> patch in _queuedPatches)
+        foreach (KeyValuePair<MethodInfo, List<QueuedPatch>> patch in _queuedPatches)
         {
             MethodInfo methodInfo = patch.Key;
-            foreach (MixinLoader.QueuedPatch queuedPatch in patch.Value)
+            foreach (QueuedPatch queuedPatch in patch.Value)
             {
                 switch (queuedPatch.Type)
                 {
@@ -48,7 +48,7 @@ internal static class MixinApplier
                                 $"Applied HEAD (prefix) on {methodInfo.Name} using {queuedPatch.HarmonyMethod.methodName}");
                         }
                         break;
-                    case AT.RETURN:
+                    case AT.POSTFIX:
                         harmony.Patch(methodInfo, postfix: queuedPatch.HarmonyMethod);
                         Logger.Log(
                             $"Applied RETURN (postfix) on {methodInfo.Name} using {queuedPatch.HarmonyMethod.methodName}");

@@ -14,6 +14,7 @@ Attribute based extensions for Harmony that lets you define mixin style patches.
 Use one of the following:
 - Reference the project directly in your solution
 - Install the published NuGet package: (Insert package when uploaded here)
+- If using publicizers add `<DoNotPublicize Include="Harmony.PatchExtensions" />` to an ItemGroup so documentations shows up in the code editor
 
 ## Quick Start
 ```csharp
