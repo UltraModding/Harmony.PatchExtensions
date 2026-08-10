@@ -50,7 +50,8 @@ public static class MixinLoader
     public static ConflictResolver ConflictResolutionMethod = ConflictResolver.Warn;
     
     private static ModuleBuilder _moduleBuilder;
-    private static Dictionary<MethodBase, List<TranspilerConfig>> _queuedTranspilers = new();
+    
+    internal static Dictionary<MethodBase, List<TranspilerConfig>> QueuedTranspilers = new();
     private static Dictionary<MethodInfo, List<QueuedPatch>> _queuedPatches = new();
     
     /// <summary>
@@ -102,7 +103,7 @@ public static class MixinLoader
     
     private static void ApplyPatches(Harmony harmony, Assembly assembly, HashSet<Type>? allowedTypes)
     {
-        _queuedTranspilers.Clear();
+        QueuedTranspilers.Clear();
         _queuedPatches.Clear();
 
         foreach (var type in assembly.GetTypes())
@@ -160,10 +161,10 @@ public static class MixinLoader
                             continue;
                         }
                         
-                        if (!_queuedTranspilers.ContainsKey(attr.TargetMethod))
-                            _queuedTranspilers[attr.TargetMethod] = new List<TranspilerConfig>();
+                        if (!QueuedTranspilers.ContainsKey(attr.TargetMethod))
+                            QueuedTranspilers[attr.TargetMethod] = new List<TranspilerConfig>();
                         
-                        _queuedTranspilers[attr.TargetMethod].Add(new TranspilerConfig(
+                        QueuedTranspilers[attr.TargetMethod].Add(new TranspilerConfig(
                             type: attr.At,
                             targetMember: attr.TargetMember,
                             patchMethod: patchMethod,
@@ -183,15 +184,15 @@ public static class MixinLoader
         
         // Process transpiler conflicts
         var transpilersToRemove = new HashSet<MethodBase>();
-        PatchExtensions.ConflictResolver.DetectTranspilerConflicts(_queuedTranspilers, transpilersToRemove);
+        PatchExtensions.ConflictResolver.DetectTranspilerConflicts(QueuedTranspilers, transpilersToRemove);
         foreach (var key in transpilersToRemove)
-            _queuedTranspilers.Remove(key);
+            QueuedTranspilers.Remove(key);
         
         
         MixinApplier.ApplyPatches(_queuedPatches, harmony, _moduleBuilder);
         
-        var transpiler = new HarmonyMethod(typeof(MixinLoader), nameof(TranspilerPiler));
-        foreach (var targetMethod in _queuedTranspilers.Keys)
+        var transpiler = new HarmonyMethod(typeof(MixinLoader), nameof(TranspilerApplier.TranspilerPiler));
+        foreach (var targetMethod in QueuedTranspilers.Keys)
         {
             try
             {
@@ -205,197 +206,4 @@ public static class MixinLoader
         }
     }
     
-    private static IEnumerable<CodeInstruction> TranspilerPiler(IEnumerable<CodeInstruction> instructions, MethodBase original, ILGenerator generator)
-    {
-        if (!_queuedTranspilers.TryGetValue(original, out var transpilerConfigs))
-            return instructions;
-        
-        var matcher = new CodeMatcher(instructions, generator);
-        
-        foreach (var config in transpilerConfigs)
-        {
-            matcher.Start();
-            
-            int currentOccurrence = 0; // for the occurrence
-            int relativeOccurrence = 0; //
-            
-            string requiredClass = "";
-            string requiredMethod = config.TargetMember;
-            // for Class.Method
-            if (requiredMethod.Contains('.')) // C#
-            {
-                var parts = requiredMethod.Split('.');
-                requiredClass = parts[0];
-                requiredMethod = parts[1];
-            }
-            else if (requiredMethod.Contains("::")) // IL
-            {
-                var parts = requiredMethod.Split(new[] { "::" }, StringSplitOptions.None); // why C#
-                requiredClass = parts[0];
-                requiredMethod = parts[1];
-            }
-            
-            while (true)
-            {
-                matcher.MatchForward(false, 
-                    new CodeMatch(instruction =>
-                    {
-                        if (config.Type == AT.RETURN && instruction.opcode == OpCodes.Ret)
-                            return true;
-                        else if (config.Type == AT.RETURN)
-                            return false;
-                        
-                        bool isMethod = instruction.opcode == OpCodes.Call 
-                                        || instruction.opcode == OpCodes.Callvirt 
-                                        || instruction.opcode == OpCodes.Newobj;
-                        bool isField  = instruction.opcode == OpCodes.Stfld 
-                                        || instruction.opcode == OpCodes.Ldfld 
-                                        || instruction.opcode == OpCodes.Ldsfld 
-                                        || instruction.opcode == OpCodes.Stsfld 
-                                        || instruction.opcode == OpCodes.Ldflda 
-                                        || instruction.opcode == OpCodes.Ldsflda;
-                        
-                        if (!isMethod && !isField) return false;
-                        
-                        string member; // in 'callvirt Class::Method' it would be 'Method'
-                        string? declaring; // in 'callvirt Class::Method' it would be 'Class'
-                        
-                        if (isMethod && instruction.operand is MethodInfo m)
-                        {
-                            member = m.Name;
-                            declaring = m.DeclaringType?.Name;
-                        }
-                        else if (isField && instruction.operand is FieldInfo f)
-                        {
-                            member = f.Name;
-                            declaring = f.DeclaringType?.Name;
-                        }
-                        else
-                            return false;
-                        
-                        if (member != requiredMethod)
-                            return false;
-                        
-                        if (!string.IsNullOrEmpty(requiredClass) && declaring != requiredClass)
-                            return false;
-                        
-                        return true;
-                    })
-                );
-
-                if (matcher.IsInvalid)
-                    break;
-                
-                currentOccurrence++;
-                if (config.StartIndex == 0 || currentOccurrence >= config.StartIndex)
-                {
-                    relativeOccurrence++;
-    
-                    bool correctOccurrence = config.Occurrence == 0 || relativeOccurrence == config.Occurrence;
-                    
-                    if (correctOccurrence)
-                    {
-                        if (config.Type == AT.INVOKE)
-                            matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Call, config.PatchMethod));
-                        else if (config.Type == AT.REDIRECT)
-                        {
-                            var targetInstruction = matcher.Instruction;
-                            
-                            if (targetInstruction.operand is not MethodBase originalMethod)
-                            {
-                                Logger.LogWarning($"REDIRECT target '{config.TargetMember}' is a field, not a method. Skipped.");
-                                matcher.Advance(1);
-                                continue;
-                            }
-                            
-                            if (!DontScrewUpStack(originalMethod, targetInstruction.opcode, config.PatchMethod))
-                            {
-                                Logger.LogWarning($"REDIRECT patch '{config.PatchMethod.Name}' doesn't match with '{config.TargetMember}'. Skipped.");
-                                matcher.Advance(1);
-                                continue;
-                            }
-                            
-                            matcher.SetInstruction(new CodeInstruction(OpCodes.Call, config.PatchMethod));
-                        }
-                        else if (config.Type == AT.AFTER)
-                        {
-                            // because calling another method (the user's patch) will lose the return value the stack has to be saved and restored after
-                            var targetIns = matcher.Instruction;
-                            bool hasReturnValue = false;
-                            Type? returnType = null;
-
-                            if (targetIns.operand is MethodInfo targetMethod)
-                            {
-                                hasReturnValue = targetMethod.ReturnType != typeof(void);
-                                returnType = targetMethod.ReturnType;
-                            }
-
-                            matcher.Advance(1);
-
-                            if (hasReturnValue && returnType != null)
-                            {
-                                var tempLocal = generator.DeclareLocal(returnType);
-
-                                matcher.Insert(
-                                    new CodeInstruction(OpCodes.Stloc, tempLocal),  // store return val
-                                    new CodeInstruction(OpCodes.Call, config.PatchMethod),  // call patch
-                                    new CodeInstruction(OpCodes.Ldloc, tempLocal)   // restore return val
-                                );
-                                matcher.Advance(3);
-                            }
-                            else // no need for all that stuff if its void or returns null
-                            {
-                                matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Call, config.PatchMethod));
-                            }
-                        }
-                        else if (config.Type == AT.RETURN)
-                        {
-                            bool returns = original is MethodInfo mi && mi.ReturnType != typeof(void);
-                            
-                            if (returns)
-                            {
-                                var tempLocal = generator.DeclareLocal(((MethodInfo)original).ReturnType);
-                                matcher.Insert(
-                                    new CodeInstruction(OpCodes.Stloc, tempLocal),
-                                    new CodeInstruction(OpCodes.Call, config.PatchMethod),
-                                    new CodeInstruction(OpCodes.Ldloc, tempLocal)
-                                );
-                                matcher.Advance(3);
-                            }
-                        }
-                        
-                        if (config.Occurrence != 0) break;
-                    }
-                }
-
-                matcher.Advance(1);
-            
-            }
-        }
-        
-        return matcher.InstructionEnumeration();
-    }
-    
-    private static bool DontScrewUpStack(MethodBase originalMethod, OpCode opCode, MethodInfo patchMethod)
-    {
-        var expectedParams = originalMethod.GetParameters().Select(p => p.ParameterType).ToList();
-        
-        // if it is calling an instance
-        if (opCode != OpCodes.Newobj && !originalMethod.IsStatic)
-            expectedParams.Insert(0, originalMethod.DeclaringType!);
-        
-        var patchParams = patchMethod.GetParameters().Select(p => p.ParameterType).ToList();
-        
-        if (expectedParams.Count != patchParams.Count)
-            return false;
-        
-        for (int i = 0; i < expectedParams.Count; i++)
-        {
-            if (!expectedParams[i].IsAssignableFrom(patchParams[i]))
-                return false;
-        }
-        
-        Type expectedReturn = originalMethod is MethodInfo mi ? mi.ReturnType : originalMethod.DeclaringType!;
-        return patchMethod.ReturnType == expectedReturn;
-    }
 }
