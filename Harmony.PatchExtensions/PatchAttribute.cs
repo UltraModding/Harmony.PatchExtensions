@@ -45,8 +45,94 @@ namespace HarmonyLib.PatchExtensions
         /// </summary>
         AFTER,
         
-        // [Obsolete("Not yet implemented")]
-        // INSERT,
+        /// <summary>
+        /// Replace an argument with a call to your method
+        /// You must also specify <see cref="PatchAttribute.Occurrence"/> to choose a specific occurrence
+        /// You must also specify <see cref="PatchAttribute.StartIndex"/> to choose the argument (0 indexed)
+        /// </summary>
+        [Obsolete("Not yet implemented")]
+        ARG,
+        
+        /// <summary>
+        /// Inserts code before a loop runs
+        /// You must also specify <see cref="PatchAttribute.Occurrence"/> to choose a specific loop occurrence
+        /// </summary>
+        [Obsolete("Not yet implemented")]
+        BEFORE_LOOP,
+        
+        /// <summary>
+        /// Inserts code at the top of a loop
+        /// You must also specify <see cref="PatchAttribute.Occurrence"/> to choose a specific loop occurrence
+        /// </summary>
+        [Obsolete("Not yet implemented")]
+        LOOP_TOP,
+        
+        /// <summary>
+        /// Inserts code at the bottom of a loop
+        /// You must also specify <see cref="PatchAttribute.Occurrence"/> to choose a specific loop occurrence
+        /// </summary>
+        [Obsolete("Not yet implemented")]
+        LOOP_BOTTOM,
+        
+        /// <summary>
+        /// Inserts code after a loop
+        /// You must also specify <see cref="PatchAttribute.Occurrence"/> to choose a specific loop occurrence
+        /// </summary>
+        [Obsolete("Not yet implemented")]
+        LOOP_AFTER,
+        
+        /// <summary>
+        /// Wraps a method in a try {} finally {} so your code will run regardless
+        /// </summary>
+        [Obsolete("Not yet implemented")]
+        FINALLY,
+        
+        // MAY NEED TO ADD A else!!!!
+        
+        /// <summary>
+        /// Runs if the 1st if evaluates true
+        /// 
+        /// </summary>
+        [Obsolete("Not yet implemented")]
+        BRANCH_TRUE,
+        
+        /// <summary>
+        /// Runs if the 1st if evaluates false
+        /// </summary>
+        [Obsolete("Not yet implemented")]
+        BRANCH_FALSE,
+        
+        /// <summary>
+        /// If a local value is written to
+        /// </summary>
+        [Obsolete("Not yet implemented")]
+        LOCAL_WRITE,
+        
+        /// <summary>
+        /// If a local value is read from
+        /// </summary>
+        [Obsolete("Not yet implemented")]
+        LOCAL_READ,
+
+        /// <summary>
+        /// If a field is written to
+        /// </summary>
+        [Obsolete("Not yet implemented")]
+        FIELD_WRITE,
+        
+        /// <summary>
+        /// If a field is read from
+        /// </summary>
+        [Obsolete("Not yet implemented")]
+        FIELD_READ,
+        
+        /// <summary>
+        /// 
+        /// </summary>
+        [Obsolete("Not yet implemented")]
+        TBD,
+
+        
     }
 
     /// <summary>
