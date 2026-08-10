@@ -13,7 +13,7 @@ public static class MixinLoader
     /// <summary>
     /// The latest version of Harmony.PatchExtensions that causes inconsistencies between new and old versions
     /// </summary>
-    public static Version LatestBreakingVersion { get; } = new Version(1, 2, 0);
+    private static Version LatestBreakingVersion { get; } = new Version(1, 2, 0);
     
     static MixinLoader()
     {
@@ -115,13 +115,19 @@ public static class MixinLoader
                 var attrs = patchMethod.GetCustomAttributes<PatchAttribute>();
                 foreach (var attr in attrs)
                 {
+                    if (attr.DoNotPatch)
+                    {
+                        Logger.LogWarning($"{patchMethod.Name} has attribute errors so it has been skipped");
+                        continue;
+                    }
+                    
                     // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
                     if (attr.TargetMethod == null)
                     {
                         Logger.LogWarning($"You must set TargetMethod in {patchMethod.Name} for the Patch to work");
                         continue;
                     }
-
+                    
                     var harmonyMethod = new HarmonyMethod(patchMethod);
                     QueuedPatch patch = new QueuedPatch(
                         harmonyMethod: harmonyMethod,
@@ -264,9 +270,11 @@ public static class MixinLoader
                             member = f.Name;
                             declaring = f.DeclaringType?.Name;
                         }
-                        else return false;
+                        else
+                            return false;
                         
-                        if (member != requiredMethod) return false;
+                        if (member != requiredMethod)
+                            return false;
                         
                         if (!string.IsNullOrEmpty(requiredClass) && declaring != requiredClass)
                             return false;

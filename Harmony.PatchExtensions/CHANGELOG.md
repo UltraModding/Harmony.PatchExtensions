@@ -1,3 +1,9 @@
+# 1.2.1
+
+Updated xml comments
+Fixed some PatchAttribute logic
+Updated readme with more examples
+
 # 1.2.0
 
 WARNING: Changed AT.RETURN to AT.POSTFIX
