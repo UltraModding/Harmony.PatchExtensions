@@ -255,6 +255,64 @@ public class TargetCalls
 }
 ```
 
+### ARG (Replacing an argument)
+```csharp
+using HarmonyLib.PatchExtensions;
+
+public static class AfterPatches
+{
+    [Patch(typeof(TargetCalls), "Foo", AT.ARG, target: "Helper.DoMath", occurrence: 1, ArgIndex: 1)]
+    private static float AfterCall(float original)
+    {
+        return original * 2;
+    }
+}
+```
+Result:
+```diff
+public class TargetCalls
+{
+    private void Foo(float a, float b)
+    {
+-        Helper.DoMath(a, b);
++        Helper.DoMath(AfterPatches.AfterCall(a), b);
+    }
+}
+```
+
+FINALLY (runs after the method, on any outcome)
+```csharp
+using HarmonyLib.PatchExtensions;
+
+public static class FinallyPatches
+{
+    [Patch(typeof(Target), "DivideOrThrow", AT.FINALLY)]
+    private static void OnFinally(Exception __exception)
+    {
+        // Runs after Target.DivideOrThrow even if it returns or throws
+        // __exception is null if it doesn't throw
+    }
+}
+```
+Result:
+```diff
+public class Target
+{
+    public int DivideOrThrow(int value, int divisor)
+    {
++       try
++       {
+            return value / divisor;
++       }
++       finally
++       {
++           FinallyPatches.OnFinally(__exception);
++       }
+    }
+}
+```
+
+
 ## Conflict Resolution
 When multiple patches/transpilers target the same method, set the resolution strategy:
 ```csharp

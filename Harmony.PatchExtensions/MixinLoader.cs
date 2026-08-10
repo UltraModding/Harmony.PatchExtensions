@@ -137,40 +137,36 @@ public static class MixinLoader
                         patchMethod: patchMethod
                     );
                     
-                    if (attr.At == AT.HEAD) // prefix
+                    switch (attr.At)
                     {
-                        if (!_queuedPatches.ContainsKey(attr.TargetMethod))
-                            _queuedPatches[attr.TargetMethod] = new List<QueuedPatch>();
-                        
-                        _queuedPatches[attr.TargetMethod].Add(patch);
-                        Logger.Log($"Queueing HEAD on {attr.TargetMethod.Name}");
-                    }
-                    else if (attr.At == AT.POSTFIX) // postfix
-                    {
-                        if (!_queuedPatches.ContainsKey(attr.TargetMethod))
-                            _queuedPatches[attr.TargetMethod] = new List<QueuedPatch>();
-                        
-                        _queuedPatches[attr.TargetMethod].Add(patch);
-                        Logger.Log($"Queueing POSTFIX on {attr.TargetMethod.Name}");
-                    }
-                    else if (attr.At is not AT.HEAD or AT.POSTFIX) // everything else
-                    {
-                        if (string.IsNullOrEmpty(attr.TargetMember))
-                        {
-                            Logger.LogWarning($"You must set 'target' in {patchMethod.Name} when using AT.{attr.At}");
-                            continue;
-                        }
-                        
-                        if (!QueuedTranspilers.ContainsKey(attr.TargetMethod))
-                            QueuedTranspilers[attr.TargetMethod] = new List<TranspilerConfig>();
-                        
-                        QueuedTranspilers[attr.TargetMethod].Add(new TranspilerConfig(
-                            type: attr.At,
-                            targetMember: attr.TargetMember,
-                            patchMethod: patchMethod,
-                            occurrence: attr.Occurrence,
-                            startIndex: attr.StartIndex)
-                        );
+                        case AT.HEAD:
+                        case AT.POSTFIX:
+                        case AT.FINALLY:
+                            if (!_queuedPatches.ContainsKey(attr.TargetMethod))
+                                _queuedPatches[attr.TargetMethod] = new List<QueuedPatch>();
+                            
+                            _queuedPatches[attr.TargetMethod].Add(patch);
+                            Logger.Log($"Queueing {attr.At} on {attr.TargetMethod.Name}");
+                            break;
+                        default:
+                            if (string.IsNullOrEmpty(attr.TargetMember))
+                            {
+                                Logger.LogWarning($"You must set 'target' in {patchMethod.Name} when using AT.{attr.At}");
+                                continue;
+                            }
+                            
+                            if (!QueuedTranspilers.ContainsKey(attr.TargetMethod))
+                                QueuedTranspilers[attr.TargetMethod] = new List<TranspilerConfig>();
+                            
+                            QueuedTranspilers[attr.TargetMethod].Add(new TranspilerConfig(
+                                type: attr.At,
+                                targetMember: attr.TargetMember,
+                                patchMethod: patchMethod,
+                                occurrence: attr.Occurrence,
+                                startIndex: attr.StartIndex,
+                                argIndex: attr.ArgIndex)
+                            );
+                            break;
                     }
                 }
             }
@@ -188,10 +184,9 @@ public static class MixinLoader
         foreach (var key in transpilersToRemove)
             QueuedTranspilers.Remove(key);
         
-        
         MixinApplier.ApplyPatches(_queuedPatches, harmony, _moduleBuilder);
         
-        var transpiler = new HarmonyMethod(typeof(MixinLoader), nameof(TranspilerApplier.TranspilerPiler));
+        var transpiler = new HarmonyMethod(typeof(TranspilerApplier), nameof(TranspilerApplier.TranspilerPiler));
         foreach (var targetMethod in QueuedTranspilers.Keys)
         {
             try

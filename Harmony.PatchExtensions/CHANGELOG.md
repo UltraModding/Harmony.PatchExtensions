@@ -1,3 +1,8 @@
+# 1.3.0
+
+Implemented AT.ARG for replacing an argument in method calls
+Implemented AT.FINALLY to run code regardless of if it throws or not
+
 # 1.2.1
 
 Updated xml comments

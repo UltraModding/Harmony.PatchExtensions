@@ -1,3 +1,5 @@
+using HarmonyLib.Tools;
+
 namespace HarmonyLib.PatchExtensions.Tests;
 
 public class ARGTests : IDisposable
@@ -7,6 +9,7 @@ public class ARGTests : IDisposable
     public ARGTests()
     {
         _harmony = new Harmony("tests.patchextensions.arg");
+        // FileLog. = "/home/dolfe/harmony.log.txt";
         MixinLoader.ConflictResolutionMethod = MixinLoader.ConflictResolver.Error;
         MixinLoader.ApplyPatches(_harmony, typeof(ARGTests).Assembly, typeof(ArgPatches));
     }
@@ -24,7 +27,7 @@ public class ARGTests : IDisposable
         ResetCounters();
         
         var target = new PatchingTargets();
-        var result = target.BarWithTwoArgs(5, 2);
+        var result = target.BarWithTwoArgs(5f, 2f);
         
         Assert.Equal(1, PatchingTargets.PatchingHelper.BarTwoArgsCalls);
         Assert.Equal(11.5f, result);
@@ -108,7 +111,20 @@ public class ARGTests : IDisposable
         Assert.Equal(9.5f, res1);
         Assert.Equal(9.5f, res2);
     }
-
+    
+    [Fact]
+    public void Arg_TestForIndex2Problems()
+    {
+        ResetCounters();
+        
+        var target = new PatchingTargets();
+        (float res1, float res2, float res3) = target.BarWithThreeArgs(5f, 4f, 2f);
+        
+        Assert.Equal(9.5f, res1);
+        Assert.Equal(11.5f, res2);
+        Assert.Equal(9.5f, res3);
+    }
+    
     private static void ResetCounters()
     {
         PatchingTargets.CallCounter.Reset();
@@ -126,29 +142,36 @@ public static class ArgPatches
 {
     // startIndex is the value
     // occurrence is the call
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgs), AT.ARG, startIndex: 1, occurrence: 0)]
+    
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgs), AT.ARG, target: "PatchingHelper.BarTwoArgs", occurrence: 0, argIndex: 2)]
     public static float ReplaceOffset(float original)
     {
         return original * 2;
     }
     
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgsTwice), AT.ARG, startIndex: 1, occurrence: 2)]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgsTwice), AT.ARG, target: "PatchingHelper.BarTwoArgs", occurrence: 2, argIndex: 2)]
     public static float ReplaceOffsetBarWithTwoArgsTwice(float original)
     {
         return original * 2;
     }
     
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgsTwice2), AT.ARG, startIndex: 1, occurrence: 0)]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgsTwice2), AT.ARG, target: "PatchingHelper.BarTwoArgs", occurrence: 0, argIndex: 2)]
     public static float ReplaceOffsetBarWithTwoArgsTwice2(float original)
     {
-        return original * 2;
+    return original * 2;
     }
     
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgsTwice3), AT.ARG, startIndex: 1, occurrence: 0)]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgsTwice3), AT.ARG, target: "PatchingHelper.BarTwoArgs", occurrence: 2, argIndex: 1)]
     public static float ReplaceOffsetBarWithTwoArgsTwice3(float original)
     {
         return original;
     }
-
+    
+    // // Test for index problems
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithThreeArgs), AT.ARG, target: "PatchingHelper.BarThreeArgs", occurrence: 2, argIndex: 2)]
+    public static float ReplaceOffsetBarWithThreeArgs(float original)
+    {
+        return original * 2;
+    }
     
 }

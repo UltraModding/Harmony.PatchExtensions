@@ -53,6 +53,18 @@ internal static class MixinApplier
                         Logger.Log(
                             $"Applied RETURN (postfix) on {methodInfo.Name} using {queuedPatch.HarmonyMethod.methodName}");
                         break;
+                    case AT.FINALLY:
+                        var returnType = queuedPatch.PatchMethod.ReturnType;
+                        if (returnType != typeof(void) && returnType != typeof(Exception))
+                        {
+                            Logger.LogError($"Finalizer {queuedPatch.PatchMethod.Name} must return void or Exception, got {returnType.Name}.");
+                            break;
+                        }
+                        harmony.Patch(methodInfo, finalizer: queuedPatch.HarmonyMethod);
+                        Logger.Log(
+                            $"Applied FINALLY on {methodInfo.Name} using {queuedPatch.HarmonyMethod.methodName}"
+                        );
+                        break;
                     default:
                         throw new NotImplementedException($"Have not implemented: {queuedPatch.Type}");
                 }

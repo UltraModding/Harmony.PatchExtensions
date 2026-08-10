@@ -122,6 +122,11 @@ public class PatchingTargets
         return value / divisor;
     }
     
+    public int DivideOrThrow3(int value, int divisor)
+    {
+        return value / divisor;
+    }
+    
     public int SumLoop(int count)
     {
         int sum = 0;
@@ -240,6 +245,14 @@ public class PatchingTargets
         return (res1, PatchingHelper.BarTwoArgs(value, offset));
     }
     
+    public (float, float, float) BarWithThreeArgs(float value, float offset, float something)
+    {
+        float res1 = PatchingHelper.BarThreeArgs(value, offset, something);
+        float res2 = PatchingHelper.BarThreeArgs(value, offset, something);
+        float res3 = PatchingHelper.BarThreeArgs(value, offset, something);
+        return (res1, res2, res3);
+    }
+    
     public static class CallCounter
     {
         public static int AddCalls;
@@ -258,6 +271,8 @@ public class PatchingTargets
         public static int BranchTrueCalls;
         public static int BranchFalseCalls;
         public static int LocalWriteCalls;
+        public static int FinallySwallowCalls;
+        public static Exception? LastFinallyException;
         
         public static void Reset()
         {
@@ -277,6 +292,8 @@ public class PatchingTargets
             BranchTrueCalls = 0;
             BranchFalseCalls = 0;
             LocalWriteCalls = 0;
+            FinallySwallowCalls = 0;
+            LastFinallyException = null;
         }
     }
     
@@ -318,6 +335,13 @@ public class PatchingTargets
             
             return (value * 1.5f) + offset;
         }
+        
+        public static float BarThreeArgs(float value, float offset, float something)
+        {
+            return (value * 1.5f) + offset / something;
+        }
+        // 9.5
+        // 11.5
         
         public static void Foo(float value)
         {

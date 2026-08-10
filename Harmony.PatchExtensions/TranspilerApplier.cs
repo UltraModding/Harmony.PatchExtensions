@@ -5,7 +5,6 @@ namespace HarmonyLib.PatchExtensions;
 
 public static class TranspilerApplier
 {
-    
     public static IEnumerable<CodeInstruction> TranspilerPiler(IEnumerable<CodeInstruction> instructions, MethodBase original, ILGenerator generator)
     {
         if (!MixinLoader.QueuedTranspilers.TryGetValue(original, out var transpilerConfigs))
@@ -44,7 +43,8 @@ public static class TranspilerApplier
                             matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Call, config.PatchMethod));
                         else if (config.Type == AT.REDIRECT)
                         {
-                            if (ApplyRedirect(matcher, config)) continue;
+                            if (ApplyRedirect(matcher, config))
+                                continue;
                         }
                         else if (config.Type == AT.AFTER)
                         {
@@ -53,6 +53,10 @@ public static class TranspilerApplier
                         else if (config.Type == AT.RETURN)
                         {
                             ApplyReturn(original, generator, matcher, config);
+                        }
+                        else if (config.Type == AT.ARG)
+                        {
+                            ApplyArg(matcher, config, generator);
                         }
                         
                         if (config.Occurrence != 0)
@@ -63,17 +67,36 @@ public static class TranspilerApplier
                 matcher.Advance(1);
             
             }
+            
+            // foreach (var instur in matcher.Instructions())
+            // {
+            //     FileLog.Log(instur.ToString());
+            // }
         }
         
         return matcher.InstructionEnumeration();
     }
     
-    private static void ApplyReturn(
-        MethodBase original,
-        ILGenerator generator,
-        CodeMatcher matcher,
-        TranspilerConfig config
-    )
+    private static void ApplyArg(CodeMatcher matcher, TranspilerConfig config, ILGenerator generator)
+    {
+        var targetInstruction = matcher.Instruction;
+        
+        if (targetInstruction.operand is MethodInfo info)
+        {
+            int maxArgs = info.GetParameters().Length;
+            if (config.ArgIndex > maxArgs)
+            {
+                Logger.LogWarning($"ARG ArgIndex '{config.ArgIndex}' is bigger than the args on '{info.Name}' ({maxArgs}). Skipped.");
+                return;
+            }
+            int n = maxArgs - (int)config.ArgIndex;
+            matcher.Advance(-n);
+            matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Call, config.PatchMethod));
+            matcher.Advance(n);
+        }
+    }
+    
+    private static void ApplyReturn(MethodBase original, ILGenerator generator, CodeMatcher matcher, TranspilerConfig config)
     {
         bool returns = original is MethodInfo mi && mi.ReturnType != typeof(void);
         
@@ -167,9 +190,11 @@ public static class TranspilerApplier
     
     private static bool Matcher(CodeInstruction instruction, TranspilerConfig config, string requiredMethod, string requiredClass)
     {
+        // FileLog.Log(instruction.ToString()); 
+        
         if (config.Type == AT.RETURN && instruction.opcode == OpCodes.Ret)
             return true;
-        else if (config.Type == AT.RETURN)
+        if (config.Type == AT.RETURN)
             return false;
         
         bool isMethod = instruction.opcode == OpCodes.Call 
@@ -182,7 +207,8 @@ public static class TranspilerApplier
                         || instruction.opcode == OpCodes.Ldflda 
                         || instruction.opcode == OpCodes.Ldsflda;
         
-        if (!isMethod && !isField) return false;
+        if (!isMethod && !isField)
+            return false;
         
         string member; // in 'callvirt Class::Method' it would be 'Method'
         string? declaring; // in 'callvirt Class::Method' it would be 'Class'

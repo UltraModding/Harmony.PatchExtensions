@@ -48,9 +48,8 @@ namespace HarmonyLib.PatchExtensions
         /// <summary>
         /// Replace an argument with a call to your method
         /// You must also specify <see cref="PatchAttribute.Occurrence"/> to choose a specific occurrence
-        /// You must also specify <see cref="PatchAttribute.StartIndex"/> to choose the argument (0 indexed)
+        /// You must also specify <see cref="PatchAttribute.ArgIndex"/> to choose the argument (0 indexed)
         /// </summary>
-        [Obsolete("Not yet implemented")]
         ARG,
         
         /// <summary>
@@ -84,11 +83,10 @@ namespace HarmonyLib.PatchExtensions
         /// <summary>
         /// Wraps a method in a try {} finally {} so your code will run regardless
         /// </summary>
-        [Obsolete("Not yet implemented")]
         FINALLY,
         
-        // MAY NEED TO ADD A else!!!!
         
+        // MAY NEED TO ADD A else!!!!
         /// <summary>
         /// Runs if the 1st if evaluates true
         /// 
@@ -180,6 +178,13 @@ namespace HarmonyLib.PatchExtensions
         public uint StartIndex { get; } = 0;
         
         /// <summary>
+        /// For <see cref="AT.ARG"/>
+        /// What argument index to replace
+        /// Use 1 to start from the first match (0 gives error)
+        /// </summary>
+        public uint ArgIndex { get; } = 0;
+        
+        /// <summary>
         /// Defines a patch for a specific method.
         /// </summary>
         /// <param name="type">The class type containing the method you want to patch.</param>
@@ -197,11 +202,16 @@ namespace HarmonyLib.PatchExtensions
         /// Use 0 to patch all matching calls after <see cref="StartIndex"/>.
         /// </param>
         /// <param name="startIndex">
-        /// (Optional) For <see cref="AT.INVOKE"/> and <see cref="AT.REDIRECT"/> and <see cref="AT.AFTER"/>
+        /// (Optional) For <see cref="AT.INVOKE"/> and <see cref="AT.REDIRECT"/> and <see cref="AT.AFTER"/> and <see cref="AT.ARG"/>
         /// Matches before this index are ignored.
         /// Use 0 to start from the first match.
         /// </param>
-        public PatchAttribute(Type type, string methodName, AT at, string? target = null, uint occurrence = 0, uint startIndex = 0, bool overwriting = false)
+        /// <param name="argIndex">
+        /// For <see cref="AT.ARG"/>
+        /// What argument index to replace
+        /// Use 1 to start from the first match (0 gives error)
+        /// </param>
+        public PatchAttribute(Type type, string methodName, AT at, string? target = null, uint occurrence = 0, uint startIndex = 0, uint argIndex = 0, bool overwriting = false)
         {
             TargetMethod = type.GetMethod(methodName, 
                 BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) ?? null;
@@ -219,6 +229,13 @@ namespace HarmonyLib.PatchExtensions
             }
             TargetMember = target!;
             
+            if (at is AT.ARG && argIndex == 0)
+            {
+                Logger.LogError($"argIndex not set when required for ARG, not running this patch.");
+                return;
+            }
+            ArgIndex = argIndex;
+            
             // if (occurrence == uint.MaxValue && at is AT.INVOKE or AT.AFTER or AT.REDIRECT)
             // {
                 // Logger.LogError($"occurrence not set when required for INVOKE, REDIRECT and AFTER, not running this patch.");
@@ -228,6 +245,7 @@ namespace HarmonyLib.PatchExtensions
             
             At = at;
             StartIndex = startIndex;
+            
             if (overwriting && at is not AT.HEAD)
             {
                 Logger.LogWarning($"FYI, overwriting set on a non head AT");
