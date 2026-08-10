@@ -192,7 +192,7 @@ namespace HarmonyLib.PatchExtensions
         /// (Optional) For <see cref="AT.HEAD"/>, set to true to cancel.
         /// </param>
         /// <param name="occurrence">
-        /// (Required) For <see cref="AT.INVOKE"/> and <see cref="AT.REDIRECT"/> and <see cref="AT.AFTER"/>
+        /// (Optional) For <see cref="AT.INVOKE"/> and <see cref="AT.REDIRECT"/> and <see cref="AT.AFTER"/>
         /// Specifies which occurrence to patch, counted relative to <see cref="StartIndex"/>.
         /// Use 0 to patch all matching calls after <see cref="StartIndex"/>.
         /// </param>
@@ -201,7 +201,7 @@ namespace HarmonyLib.PatchExtensions
         /// Matches before this index are ignored.
         /// Use 0 to start from the first match.
         /// </param>
-        public PatchAttribute(Type type, string methodName, AT at, string? target = null, uint occurrence = uint.MaxValue, uint startIndex = 0, bool overwriting = false)
+        public PatchAttribute(Type type, string methodName, AT at, string? target = null, uint occurrence = 0, uint startIndex = 0, bool overwriting = false)
         {
             TargetMethod = type.GetMethod(methodName, 
                 BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) ?? null;
@@ -219,11 +219,11 @@ namespace HarmonyLib.PatchExtensions
             }
             TargetMember = target!;
             
-            if (occurrence == uint.MaxValue && at is AT.INVOKE or AT.AFTER or AT.REDIRECT)
-            {
-                Logger.LogError($"occurrence not set when required for INVOKE, REDIRECT and AFTER, not running this patch.");
-                return;
-            }
+            // if (occurrence == uint.MaxValue && at is AT.INVOKE or AT.AFTER or AT.REDIRECT)
+            // {
+                // Logger.LogError($"occurrence not set when required for INVOKE, REDIRECT and AFTER, not running this patch.");
+                // return;
+            // }
             Occurrence = occurrence;
             
             At = at;

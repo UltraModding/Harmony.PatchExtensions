@@ -41,19 +41,32 @@ internal static class ConflictResolver
         Dictionary<MethodBase, List<TranspilerConfig>> transpilers,
         HashSet<MethodBase> toRemove)
     {
-        foreach (var group in transpilers.Where(g => g.Value.Count > 1))
+        foreach (var trans in transpilers)
         {
-            LogConflict(group.Key, group.Value.Select(t => t.PatchMethod));
-        
-            switch (MixinLoader.ConflictResolutionMethod)
+            MethodBase method = trans.Key;
+            List<TranspilerConfig> configs = trans.Value;
+            
+            var groupBy = configs.GroupBy(t => (t.TargetMember, t.StartIndex, t.Occurrence));
+            
+            foreach (var config in groupBy.Where(grouping => grouping.Count() > 1))
             {
-                case MixinLoader.ConflictResolver.SkipConflicts:
-                    toRemove.Add(group.Key);
-                    break;
-                case MixinLoader.ConflictResolver.Error:
-                    toRemove.Add(group.Key);
-                    throw new InvalidOperationException(
-                        $"Conflict detected: {group.Value.Count} transpiler patches target {group.Key.Name}");
+                if (config.Count(transpilerConfig => transpilerConfig.Type is AT.REDIRECT or AT.RETURN) <= 1)
+                {
+                    continue;
+                }
+                
+                LogConflict(method, config.Select(transpilerConfig => transpilerConfig.PatchMethod));
+                
+                switch (MixinLoader.ConflictResolutionMethod)
+                {
+                    case MixinLoader.ConflictResolver.SkipConflicts:
+                        toRemove.Add(method);
+                        break;
+                    case MixinLoader.ConflictResolver.Error:
+                        toRemove.Add(method);
+                        throw new InvalidOperationException(
+                            $"Conflict detected: {config.Count()} transpiler patches target {method.Name} at {config.Key}");
+                }
             }
         }
     }

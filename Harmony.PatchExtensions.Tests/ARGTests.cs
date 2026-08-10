@@ -126,28 +126,29 @@ public static class ArgPatches
 {
     // startIndex is the value
     // occurrence is the call
-    [Patch( typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgs), AT.ARG, startIndex: 1, occurrence: 0)]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgs), AT.ARG, startIndex: 1, occurrence: 0)]
     public static float ReplaceOffset(float original)
     {
         return original * 2;
     }
     
-    [Patch( typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgsTwice), AT.ARG, startIndex: 1, occurrence: 2)]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgsTwice), AT.ARG, startIndex: 1, occurrence: 2)]
     public static float ReplaceOffsetBarWithTwoArgsTwice(float original)
     {
         return original * 2;
     }
     
-    [Patch( typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgsTwice2), AT.ARG, startIndex: 1, occurrence: 0)]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgsTwice2), AT.ARG, startIndex: 1, occurrence: 0)]
     public static float ReplaceOffsetBarWithTwoArgsTwice2(float original)
     {
         return original * 2;
     }
     
-    [Patch( typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgsTwice3), AT.ARG, startIndex: 1, occurrence: 0)]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgsTwice3), AT.ARG, startIndex: 1, occurrence: 0)]
     public static float ReplaceOffsetBarWithTwoArgsTwice3(float original)
     {
         return original;
     }
 
+    
 }

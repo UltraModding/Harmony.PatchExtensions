@@ -152,7 +152,7 @@ public static class MixinLoader
                         _queuedPatches[attr.TargetMethod].Add(patch);
                         Logger.Log($"Queueing POSTFIX on {attr.TargetMethod.Name}");
                     }
-                    else if (attr.At == AT.INVOKE || attr.At == AT.REDIRECT || attr.At == AT.AFTER || attr.At == AT.RETURN) // before target / replace target / or after
+                    else if (attr.At is not AT.HEAD or AT.POSTFIX) // everything else
                     {
                         if (string.IsNullOrEmpty(attr.TargetMember))
                         {
