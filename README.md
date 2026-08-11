@@ -4,7 +4,7 @@ Attribute based extensions for Harmony that lets you define mixin style patches.
 
 ## Features
 - Attribute based patches
-- Injection points: HEAD (prefix), POSTFIX, RETURN (At every return), INVOKE (insert before call), REDIRECT (replace call), AFTER (after call)
+- Injection points: HEAD (prefix), POSTFIX, RETURN (At every return), INVOKE (insert before call), REDIRECT (replace call), AFTER (after call), FINALLY, ARG, LOOP_BEFORE/TOP/BOTTOM/AFTER, BRANCH_TRUE/FALSE, LOCAL_WRITE/READ, ARG_WRITE/READ, FIELD_WRITE/READ
 - Occurrence and start-index targeting
 - Conflict detection
 - Optional wrapper for overwriting prefixes that return the target's return type
