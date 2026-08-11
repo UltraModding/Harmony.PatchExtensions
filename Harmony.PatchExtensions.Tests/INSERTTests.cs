@@ -8,7 +8,7 @@ public class INSERTTests : IDisposable
     {
         _harmony = new Harmony("tests.patchextensions.redirect");
         MixinLoader.ConflictResolutionMethod = MixinLoader.ConflictResolver.Error;
-        MixinLoader.ApplyPatches(_harmony, typeof(INSERTTests).Assembly, typeof(InsertPatches));
+        MixinLoader.ApplyPatches(_harmony, typeof(INSERTTests).Assembly, typeof(REDIRECTPatches));
     }
 
     /// <summary>
@@ -17,13 +17,13 @@ public class INSERTTests : IDisposable
     [Fact]
     public void Redirect()
     {
-        // ResetCounters();
-        //
-        // var target = new PatchingTargets();
-        // var result = target.CallHelper(10);
-        //
-        // Assert.Equal(68, result);
-        // Assert.Equal(0, PatchingTargets.PatchingHelper.DoubleCalls);
+        ResetCounters();
+        
+        var target = new PatchingTargets();
+        var result = target.Double(10);
+        
+        Assert.Equal(68, result);
+        Assert.Equal(0, PatchingTargets.PatchingHelper.DoubleCalls);
     }
 
     private static void ResetCounters()
@@ -33,15 +33,12 @@ public class INSERTTests : IDisposable
     }
 
     /// <inheritdoc />
-    public void Dispose()
-    {
-        _harmony.UnpatchSelf();
-    }
+    public void Dispose() => _harmony.UnpatchSelf();
 }
 
-public static class InsertPatches
+public static class REDIRECTPatches
 {
-    // [Patch(typeof(InsertPatches), nameof(PatchingTargets.CallHelper), AT.INSERT, target: "PatchingHelper.Double")]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.Double), AT.REDIRECT, target: "PatchingHelper.Double")]
     public static int ReplaceDouble(int value)
     {
         return 68;

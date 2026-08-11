@@ -1,74 +1,81 @@
+using HarmonyLib.Tools;
+
 namespace HarmonyLib.PatchExtensions.Tests;
 
-public class FINALLYTests : IDisposable
+public class FinallyTests : IDisposable
 {
     private readonly Harmony _harmony;
-    private readonly PatchingTargets _target = new();
     
-    public FINALLYTests()
+    public FinallyTests()
     {
         _harmony = new Harmony("tests.patchextensions.finally");
         MixinLoader.ConflictResolutionMethod = MixinLoader.ConflictResolver.Error;
-        MixinLoader.ApplyPatches(_harmony, typeof(FINALLYTests).Assembly, typeof(FinallyPatches));
-        ResetCounters();
-    }
-    
-    private static void ResetCounters()
-    {
-        PatchingTargets.CallCounter.Reset();
-        PatchingTargets.PatchingHelper.Reset();
+        MixinLoader.ApplyPatches(_harmony, typeof(FinallyTests).Assembly, typeof(FinallyPatches));
     }
     
     [Fact]
     public void Finally_RunsOnNormalReturn_NoException()
     {
-        int result = _target.DivideOrThrow2(10, 2);
+        ResetCounters();
+        
+        var target = new PatchingTargets();
+        var result = target.DivideOrThrow(10, 2);
         
         Assert.Equal(5, result);
-        Assert.Equal(1, PatchingTargets.CallCounter.FinallyCalls);
+        Assert.Equal(2, PatchingTargets.CallCounter.FinallyCalls); // DivideOrThrow's own finally block + the AT.FINALLY patch
         Assert.Null(PatchingTargets.CallCounter.LastFinallyException);
     }
     
     [Fact]
-    public void Finally_RunsOnException_AndExceptionPropagates()
+    public void Finally_RunsOnException_ExceptionStillPropagates()
     {
-        Assert.Throws<DivideByZeroException>(() => _target.DivideOrThrow2(10, 0));
+        ResetCounters();
+        
+        var target = new PatchingTargets();
+        
+        Assert.Throws<DivideByZeroException>(() => target.DivideOrThrow2(10, 0));
         
         Assert.Equal(1, PatchingTargets.CallCounter.FinallyCalls);
-        Assert.NotNull(PatchingTargets.CallCounter.LastFinallyException);
         Assert.IsType<DivideByZeroException>(PatchingTargets.CallCounter.LastFinallyException);
     }
     
     [Fact]
-    public void Finally_CanSwallowException()
+    public void Finally_SwallowsException_NoThrow_DefaultResult()
     {
-        // No exception should propagate — swallowed by the finalizer
-        var ex = Record.Exception(() => _target.DivideOrThrow3(10, 0));
+        ResetCounters();
         
-        Assert.Null(ex);
+        var target = new PatchingTargets();
+        var result = target.DivideOrThrow3(10, 0);
+        
+        Assert.Equal(0, result);
         Assert.Equal(1, PatchingTargets.CallCounter.FinallySwallowCalls);
     }
     
-    /// <inheritdoc />
-    public void Dispose()
-    {
-        _harmony.UnpatchSelf();
-    }
+    private static void ResetCounters() => PatchingTargets.CallCounter.Reset();
+    
+    public void Dispose() => _harmony.UnpatchSelf();
 }
 
 public static class FinallyPatches
 {
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.DivideOrThrow), AT.FINALLY)]
+    public static void RecordFinally(Exception __exception)
+    {
+        PatchingTargets.CallCounter.FinallyCalls++;
+        PatchingTargets.CallCounter.LastFinallyException = __exception;
+    }
+    
     [Patch(typeof(PatchingTargets), nameof(PatchingTargets.DivideOrThrow2), AT.FINALLY)]
-    public static void OnDivideFinally(Exception __exception)
+    public static void RecordFinallyOnException(Exception __exception)
     {
         PatchingTargets.CallCounter.FinallyCalls++;
         PatchingTargets.CallCounter.LastFinallyException = __exception;
     }
     
     [Patch(typeof(PatchingTargets), nameof(PatchingTargets.DivideOrThrow3), AT.FINALLY)]
-    public static Exception? SwallowDivideException(Exception __exception)
+    public static Exception SwallowFinally(Exception __exception)
     {
         PatchingTargets.CallCounter.FinallySwallowCalls++;
-        return null;
+        return null; // suppress
     }
 }

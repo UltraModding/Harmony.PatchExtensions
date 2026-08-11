@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
 namespace HarmonyLib.PatchExtensions 
@@ -6,6 +7,7 @@ namespace HarmonyLib.PatchExtensions
     /// <summary>
     /// The injection point or strategy for applying a Mixin patch.
     /// </summary>
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
     public enum AT
     {
         /// <summary>
@@ -56,28 +58,24 @@ namespace HarmonyLib.PatchExtensions
         /// Inserts code before a loop runs
         /// You must also specify <see cref="PatchAttribute.Occurrence"/> to choose a specific loop occurrence
         /// </summary>
-        [Obsolete("Not yet implemented")]
-        BEFORE_LOOP,
+        LOOP_BEFORE,
         
         /// <summary>
         /// Inserts code at the top of a loop
         /// You must also specify <see cref="PatchAttribute.Occurrence"/> to choose a specific loop occurrence
         /// </summary>
-        [Obsolete("Not yet implemented")]
         LOOP_TOP,
         
         /// <summary>
         /// Inserts code at the bottom of a loop
         /// You must also specify <see cref="PatchAttribute.Occurrence"/> to choose a specific loop occurrence
         /// </summary>
-        [Obsolete("Not yet implemented")]
         LOOP_BOTTOM,
         
         /// <summary>
         /// Inserts code after a loop
         /// You must also specify <see cref="PatchAttribute.Occurrence"/> to choose a specific loop occurrence
         /// </summary>
-        [Obsolete("Not yet implemented")]
         LOOP_AFTER,
         
         /// <summary>
@@ -85,41 +83,55 @@ namespace HarmonyLib.PatchExtensions
         /// </summary>
         FINALLY,
         
-        
         // MAY NEED TO ADD A else!!!!
         /// <summary>
-        /// Runs if the 1st if evaluates true
-        /// 
+        /// Runs if the branch evaluates true
+        /// You must also specify <see cref="PatchAttribute.Occurrence"/> to choose a specific branch occurrence
         /// </summary>
-        [Obsolete("Not yet implemented")]
         BRANCH_TRUE,
         
         /// <summary>
-        /// Runs if the 1st if evaluates false
+        /// Runs if the branch evaluates false
+        /// You must also specify <see cref="PatchAttribute.Occurrence"/> to choose a specific branch occurrence
         /// </summary>
-        [Obsolete("Not yet implemented")]
         BRANCH_FALSE,
         
         /// <summary>
         /// If a local value is written to
+        /// You must also specify <see cref="PatchAttribute.TargetMember"/> to choose what local to detect writes
         /// </summary>
-        [Obsolete("Not yet implemented")]
         LOCAL_WRITE,
         
         /// <summary>
         /// If a local value is read from
+        /// You must also specify <see cref="PatchAttribute.TargetMember"/> to choose what local to detect reads
         /// </summary>
-        [Obsolete("Not yet implemented")]
         LOCAL_READ,
 
         /// <summary>
+        /// If an arg is written to
+        /// You must also specify <see cref="PatchAttribute.TargetMember"/> to choose what arg to detect writes
+        /// </summary>
+        [Obsolete("Not yet implemented")]
+        ARG_WRITE,
+        
+        /// <summary>
+        /// If ab arg is read from
+        /// You must also specify <see cref="PatchAttribute.TargetMember"/> to choose what arg to detect reads
+        /// </summary>
+        [Obsolete("Not yet implemented")]
+        ARG_READ,
+        
+        /// <summary>
         /// If a field is written to
+        /// You must also specify <see cref="PatchAttribute.TargetMember"/> to choose what field to detect writes
         /// </summary>
         [Obsolete("Not yet implemented")]
         FIELD_WRITE,
         
         /// <summary>
         /// If a field is read from
+        /// You must also specify <see cref="PatchAttribute.TargetMember"/> to choose what field to detect writes
         /// </summary>
         [Obsolete("Not yet implemented")]
         FIELD_READ,
@@ -129,8 +141,6 @@ namespace HarmonyLib.PatchExtensions
         /// </summary>
         [Obsolete("Not yet implemented")]
         TBD,
-
-        
     }
 
     /// <summary>
@@ -248,7 +258,7 @@ namespace HarmonyLib.PatchExtensions
             
             if (overwriting && at is not AT.HEAD)
             {
-                Logger.LogWarning($"FYI, overwriting set on a non head AT");
+                Logger.LogWarning($"FYI, overwriting set on a non head AT does nothing");
             }
             Overwriting = overwriting;
             

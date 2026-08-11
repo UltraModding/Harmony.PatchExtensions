@@ -1,7 +1,15 @@
 # 1.3.0
 
-Implemented AT.ARG for replacing an argument in method calls
+Implemented AT.ARG for replacing an argument in method calls and ArgIndex for targeting the arg
 Implemented AT.FINALLY to run code regardless of if it throws or not
+Implemented AT.LOOP_BEFORE/TOP/BOTTOM/AFTER
+Implemented BRANCH_TRUE/FALSE
+Implemented LOCAL_WRITE/READ
+Implemented ARG_WRITE/READ
+Implemented FIELD_WRITE/READ
+
+Internally implemented more helpers, tests and a test console project
+Added lots of documentation
 
 # 1.2.1
 

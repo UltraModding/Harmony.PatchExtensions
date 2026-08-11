@@ -66,10 +66,7 @@ public class HEADTests : IDisposable
     }
     
     /// <inheritdoc />
-    public void Dispose()
-    {
-        _harmony.UnpatchSelf();
-    }
+    public void Dispose() => _harmony.UnpatchSelf();
 }
 
 public static class HeadPatches

@@ -1,6 +1,8 @@
 using System.Reflection;
 using System.Reflection.Emit;
 
+using Mono.Cecil;
+
 namespace HarmonyLib.PatchExtensions;
 
 public static class TranspilerApplier
@@ -23,8 +25,8 @@ public static class TranspilerApplier
             
             while (true)
             {
-                matcher.MatchForward(false, 
-                    new CodeMatch(instruction => Matcher(instruction, config, requiredMethod, requiredClass))
+                matcher.MatchForward(false,
+                    new CodeMatch(instruction => Matcher(instruction, config, requiredMethod, requiredClass, matcher))
                 );
 
                 if (matcher.IsInvalid)
@@ -39,24 +41,46 @@ public static class TranspilerApplier
                     
                     if (correctOccurrence)
                     {
-                        if (config.Type == AT.INVOKE)
-                            matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Call, config.PatchMethod));
-                        else if (config.Type == AT.REDIRECT)
+                        switch (config.Type)
                         {
-                            if (ApplyRedirect(matcher, config))
-                                continue;
-                        }
-                        else if (config.Type == AT.AFTER)
-                        {
-                            ApplyAfter(matcher, config, generator);
-                        }
-                        else if (config.Type == AT.RETURN)
-                        {
-                            ApplyReturn(original, generator, matcher, config);
-                        }
-                        else if (config.Type == AT.ARG)
-                        {
-                            ApplyArg(matcher, config, generator);
+                            case AT.INVOKE: 
+                                matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Call, config.PatchMethod));
+                                break;
+                            case AT.REDIRECT 
+                                when ApplyRedirect(matcher, config): 
+                                    continue;
+                            case AT.AFTER:
+                                ApplyAfter(matcher, config, generator);
+                                break;
+                            case AT.RETURN:
+                                ApplyReturn(original, generator, matcher, config);
+                                break;
+                            case AT.ARG:
+                                ApplyArg(matcher, config, generator);
+                                break;
+                            case AT.BRANCH_TRUE:
+                                ApplyBranch(matcher, config, generator, true);
+                                break;
+                            case AT.BRANCH_FALSE:
+                                ApplyBranch(matcher, config, generator, false);
+                                break;
+                            case AT.LOOP_BEFORE:
+                                matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Call, config.PatchMethod)); break;
+                            case AT.LOOP_TOP:
+                                ApplyLoopTop(matcher, config, generator);
+                                break;
+                            case AT.LOOP_BOTTOM:
+                                ApplyLoopBottom(matcher, config, generator);
+                                break;
+                            case AT.LOOP_AFTER:
+                                ApplyLoopAfter(matcher, config, generator);
+                                break;
+                            case AT.LOCAL_READ:
+                                LocalRead(original, matcher, config, generator);
+                                break;
+                            case AT.LOCAL_WRITE:
+                                LocalWrite(original, matcher, config, generator);
+                                break;
                         }
                         
                         if (config.Occurrence != 0)
@@ -65,7 +89,6 @@ public static class TranspilerApplier
                 }
                 
                 matcher.Advance(1);
-            
             }
             
             // foreach (var instur in matcher.Instructions())
@@ -76,6 +99,221 @@ public static class TranspilerApplier
         
         return matcher.InstructionEnumeration();
     }
+    
+    #region ARG_R/W
+    
+    
+    
+    #endregion
+    
+    #region FIELD_R/W
+    
+    
+    
+    #endregion
+    
+    #region LOCAL_R/W
+    
+    private static void LocalWrite(
+        MethodBase original,
+        CodeMatcher matcher,
+        TranspilerConfig config,
+        ILGenerator generator
+    )
+    {
+        string? dllPath = original.DeclaringType?.Assembly.Location;
+        if (dllPath == null)
+        {
+            throw new Exception("Unable to get target Assembly path.");
+        }
+        
+        var module = ModuleDefinition.ReadModule(dllPath, new ReaderParameters { ReadSymbols = true });
+        var method = (MethodDefinition)module.LookupToken(original.MetadataToken);
+        
+        Dictionary<int, string> localsIndex = new();
+        foreach (var v in method.DebugInformation.Scope.Variables)
+        {
+            localsIndex.Add(v.Index, v.Name);
+        }
+        
+        var instruction = matcher.Instruction;
+        
+        if (OpCodeHelper.TryGetLocalIndex(instruction, out int index, out bool isWrite, out bool isAddress))
+        {
+            if (!isWrite || isAddress)
+                return;
+            
+            
+            if (localsIndex.TryGetValue(index, out string? name) && name == config.TargetMember)
+            {
+                // Logger.Log($"Writing {localsIndex[index]}");
+                matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Dup));
+                matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Call, config.PatchMethod));
+            }
+            // Logger.Log($"Instruction: {instruction.opcode}, index: {index}, isWrite: {isWrite}, isAddress: {isAddress}");
+        }
+    }
+    
+    private static void LocalRead(
+        MethodBase original,
+        CodeMatcher matcher,
+        TranspilerConfig config,
+        ILGenerator generator
+    )
+    {
+        string? dllPath = original.DeclaringType?.Assembly.Location;
+        if (dllPath == null)
+        {
+            throw new Exception("Unable to get target Assembly path.");
+        }
+        
+        var module = ModuleDefinition.ReadModule(dllPath, new ReaderParameters { ReadSymbols = true });
+        var method = (MethodDefinition)module.LookupToken(original.MetadataToken);
+        
+        Dictionary<int, string> localsIndex = new();
+        foreach (var v in method.DebugInformation.Scope.Variables)
+        {
+            localsIndex.Add(v.Index, v.Name);
+            // Logger.Log($"{v.Index}: {v.Name}");
+        }
+        
+        var instruction = matcher.Instruction;
+        
+        if (OpCodeHelper.TryGetLocalIndex(instruction, out int index, out bool isWrite, out bool isAddress))
+        {
+            if (isWrite || isAddress)
+                return;
+            
+            if (localsIndex.TryGetValue(index, out string? name) && name == config.TargetMember)
+            {
+                // Logger.Log($"Reading {localsIndex[index]}");
+                matcher.Advance(1);
+                matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Dup));
+                matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Call, config.PatchMethod));
+            }
+        }
+    }
+    
+    #endregion
+    
+    #region LOOP_T/B/A/B
+    
+    private static void ApplyLoopTop(CodeMatcher matcher, TranspilerConfig config, ILGenerator generator)
+    {
+        var brInstruction = matcher.Instruction;
+        Label conditionLabel = (Label)brInstruction.operand;
+        int branchIdx = matcher.Pos;
+        
+        int conditionIndex = matcher.Instructions().FindIndex(ci => ci.labels.Contains(conditionLabel));
+        if (conditionIndex == -1)
+            throw new Exception("Could not resolve branch target label.");
+        
+        matcher.Advance(conditionIndex - branchIdx);
+        
+        ContinueToConditional(matcher);
+        
+        var condBranch = matcher.Instruction;
+        Label bodyLabel = (Label)condBranch.operand;
+        int condBranchIndex = matcher.Pos;
+        
+        int bodyIndex = matcher.Instructions().FindIndex(ci => ci.labels.Contains(bodyLabel));
+        if (bodyIndex == -1)
+            throw new Exception("Could not resolve loop body label.");
+        
+        matcher.Advance(bodyIndex - condBranchIndex);
+        matcher.Advance(1);
+        matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Call, config.PatchMethod));
+    }
+    
+    private static void ApplyLoopBottom(CodeMatcher matcher, TranspilerConfig config, ILGenerator generator)
+    {
+        var brInstruction = matcher.Instruction; // IL_0003: br.s  IL_002a
+        Label conditionLabel = (Label)brInstruction.operand; // IL_002a
+        int branchIdx = matcher.Pos;
+        
+        var instructions = matcher.Instructions();
+        int conditionIdx = instructions.FindIndex(codeInstruction => codeInstruction.labels.Contains(conditionLabel));
+        if (conditionIdx == -1)
+            throw new Exception("Could not resolve branch target label.");
+        
+        int insertIdx = conditionIdx;
+        for (int i = branchIdx + 1; i < conditionIdx; i++)
+        {
+            if (!OpCodeHelper.IsLoop(instructions[i].opcode) || instructions[i].operand is not Label continueLabel)
+                continue;
+            
+            int continueTarget = instructions.FindIndex(x => x.labels.Contains(continueLabel));
+            if (continueTarget > i && continueTarget < conditionIdx)
+            {
+                insertIdx = continueTarget;
+                break;
+            }
+        }
+        
+        matcher.Advance(insertIdx - branchIdx);
+        
+        matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Call, config.PatchMethod));
+    }
+    
+    private static void ApplyLoopAfter(CodeMatcher matcher, TranspilerConfig config, ILGenerator generator)
+    {
+        var brInstruction = matcher.Instruction;
+        Label conditionLabel = (Label)brInstruction.operand;
+        int branchIndex = matcher.Pos;
+        
+        int conditionIndex = matcher.Instructions().FindIndex(ci => ci.labels.Contains(conditionLabel));
+        if (conditionIndex == -1)
+            throw new Exception("Could not resolve branch target label.");
+        
+        matcher.Advance(conditionIndex - branchIndex);
+        
+        ContinueToConditional(matcher);
+        
+        matcher.Advance(1);
+        
+        var afterLoop = matcher.Instruction;
+        var call = new CodeInstruction(OpCodes.Call, config.PatchMethod) { labels = afterLoop.labels };
+        afterLoop.labels = new List<Label>();
+        matcher.InsertAndAdvance(call);
+    }
+
+    private static void ContinueToConditional(CodeMatcher matcher)
+    {
+        int steps = 0;
+        int max = matcher.Instructions().Count;
+
+        while (!OpCodeHelper.IsConditional(matcher.Instruction.opcode))
+        {
+            matcher.Advance(1);
+            if (++steps > max)
+                throw new Exception("Failed to resolve loop condition branch.");
+        }
+    }
+
+    #endregion
+
+    #region BRANCH_T/F
+    
+    // Edge cases:
+    // Multiple vars, else existing or not, should be solved, and Brfalse is not _S
+    private static void ApplyBranch(CodeMatcher matcher, TranspilerConfig config, ILGenerator generator, bool wantTrue)
+    {
+        // At brfalse, dup then add brtrue that goes to brfalse
+        // between brtrue and brfalse add calls
+        // same case but inverted
+        OpCode guardOp = wantTrue ? OpCodes.Brfalse_S : OpCodes.Brtrue_S;
+        
+        Label skip = generator.DefineLabel();
+        matcher.Instruction.labels.Add(skip);
+        
+        matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Dup));
+        matcher.InsertAndAdvance(new CodeInstruction(guardOp, skip));
+        matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Call, config.PatchMethod));
+    }
+    
+    #endregion
+    
+    #region ARG
     
     private static void ApplyArg(CodeMatcher matcher, TranspilerConfig config, ILGenerator generator)
     {
@@ -96,6 +334,10 @@ public static class TranspilerApplier
         }
     }
     
+    #endregion
+    
+    #region RETURN
+    
     private static void ApplyReturn(MethodBase original, ILGenerator generator, CodeMatcher matcher, TranspilerConfig config)
     {
         bool returns = original is MethodInfo mi && mi.ReturnType != typeof(void);
@@ -112,9 +354,13 @@ public static class TranspilerApplier
         }
     }
     
+    #endregion
+    
+    #region AFTER
+    
     private static void ApplyAfter(CodeMatcher matcher, TranspilerConfig config, ILGenerator generator)
     {
-        // because calling another method (the user's patch) will lose the return value the stack has to be saved and restored after
+        // save and restore the stack because plates break
         var targetIns = matcher.Instruction;
         bool hasReturnValue = false;
         Type? returnType = null;
@@ -144,6 +390,10 @@ public static class TranspilerApplier
         }
     }
     
+    #endregion
+    
+    #region REDIRECT
+    
     private static bool ApplyRedirect(CodeMatcher matcher, TranspilerConfig config)
     {
         var targetInstruction = matcher.Instruction;
@@ -167,8 +417,14 @@ public static class TranspilerApplier
         return false;
     }
     
+    #endregion
+    
+    
     private static (string, string) GetRequired(TranspilerConfig config)
     {
+        if (string.IsNullOrEmpty(config.TargetMember))
+            return ("", "");
+        
         string requiredClass = "";
         string requiredMethod = config.TargetMember;
         // for Class.Method
@@ -188,25 +444,27 @@ public static class TranspilerApplier
         return (requiredClass, requiredMethod);
     }
     
-    private static bool Matcher(CodeInstruction instruction, TranspilerConfig config, string requiredMethod, string requiredClass)
+    private static bool Matcher(CodeInstruction instruction, TranspilerConfig config, string requiredMethod, string requiredClass, CodeMatcher matcher)
     {
-        // FileLog.Log(instruction.ToString()); 
+        // FileLog.Log(instruction.ToString());
         
-        if (config.Type == AT.RETURN && instruction.opcode == OpCodes.Ret)
-            return true;
+        bool isRet = instruction.opcode == OpCodes.Ret;
         if (config.Type == AT.RETURN)
-            return false;
+            return isRet;
         
-        bool isMethod = instruction.opcode == OpCodes.Call 
-                        || instruction.opcode == OpCodes.Callvirt 
-                        || instruction.opcode == OpCodes.Newobj;
-        bool isField  = instruction.opcode == OpCodes.Stfld 
-                        || instruction.opcode == OpCodes.Ldfld 
-                        || instruction.opcode == OpCodes.Ldsfld 
-                        || instruction.opcode == OpCodes.Stsfld 
-                        || instruction.opcode == OpCodes.Ldflda 
-                        || instruction.opcode == OpCodes.Ldsflda;
+        bool isBranch = OpCodeHelper.IsBranch(instruction.opcode);
+        if (config.Type == AT.BRANCH_TRUE || config.Type == AT.BRANCH_FALSE)
+            return isBranch;
+
+        if (config.Type is AT.LOOP_BEFORE or AT.LOOP_TOP or AT.LOOP_BOTTOM or AT.LOOP_AFTER)
+            return OpCodeHelper.IsLoopEntryBranch(instruction, matcher.Instructions());
         
+        bool isLoc = OpCodeHelper.IsLocalOpcode(instruction.opcode);
+        if (config.Type is AT.LOCAL_READ or AT.LOCAL_WRITE)
+            return isLoc;
+        
+        bool isMethod = OpCodeHelper.IsMethod(instruction.opcode);
+        bool isField = OpCodeHelper.IsField(instruction.opcode);
         if (!isMethod && !isField)
             return false;
         

@@ -148,6 +148,24 @@ public static class MixinLoader
                             _queuedPatches[attr.TargetMethod].Add(patch);
                             Logger.Log($"Queueing {attr.At} on {attr.TargetMethod.Name}");
                             break;
+                        case AT.BRANCH_TRUE:
+                        case AT.BRANCH_FALSE:
+                        case AT.LOOP_BEFORE:
+                        case AT.LOOP_TOP:
+                        case AT.LOOP_BOTTOM:
+                        case AT.LOOP_AFTER:
+                            if (!QueuedTranspilers.ContainsKey(attr.TargetMethod))
+                                QueuedTranspilers[attr.TargetMethod] = new List<TranspilerConfig>();
+                            
+                            QueuedTranspilers[attr.TargetMethod].Add(new TranspilerConfig(
+                                type: attr.At,
+                                targetMember: attr.TargetMember,
+                                patchMethod: patchMethod,
+                                occurrence: attr.Occurrence,
+                                startIndex: attr.StartIndex,
+                                argIndex: attr.ArgIndex)
+                            );
+                            break;
                         default:
                             if (string.IsNullOrEmpty(attr.TargetMember))
                             {
@@ -196,7 +214,23 @@ public static class MixinLoader
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Exception {targetMethod.Name}: {ex.Message}");
+                StackFrame[] frames = new StackTrace().GetFrames();
+                string log = string.Join(", ", frames.Select(_ => $"{_.GetFileName()}:{_.GetFileLineNumber()}"));
+                Logger.LogError($"Exception {targetMethod.Name}: {ex.Message}, type: {ex.GetType()}, {log}");
+                Exception? cur = ex;
+                int depth = 0;
+                while (cur != null)
+                {
+                    Logger.LogError($"[{depth}] {cur.GetType()}: {cur.Message}");
+                    cur = cur.InnerException;
+                    depth++;
+                }
+                if (ex is HarmonyException hEx)
+                {
+                    foreach (var kv in hEx.GetInstructionsWithOffsets())
+                        Logger.LogError($"IL[{kv.Key:X4}] {kv.Value}");
+                    Logger.LogError($"ErrorOffset: {hEx.GetErrorOffset()}, ErrorIndex: {hEx.GetErrorIndex()}");
+                }
             }
         }
     }
