@@ -409,7 +409,8 @@ public class Target
 +       Console.WriteLine($"Field write: {locFloat}");
         float locFloat = 99f;
         
-        if (locFloat /* locFloat is read and the method is called, but it's hard to show */ > num)
+-        if (locFloat > num)
++        if (locFloat /* locFloat is read and the method is called, but it's hard to show */ > num)
         {
             ClassVar = locFloat;
 +           Console.WriteLine($"Field read: {locFloat}");
