@@ -381,6 +381,7 @@ public class Target
 ```
 
 ### LOCAL_READ/WRITE
+There is also ARG and FIELD
 ```csharp
 using HarmonyLib.PatchExtensions;
 
@@ -389,13 +390,13 @@ public static class LocalPatches
     [Patch(typeof(Target), nameof(Target.ReadAndWriteVars), AT.LOCAL_READ, target: "locFloat", occurrence: 0)]
     public static void LocalRead(float val)
     {
-        Console.WriteLine($"Field read: {val}");
+        Console.WriteLine($"Local read: {val}");
     }
     
     [Patch(typeof(Target), nameof(Target.ReadAndWriteVars), AT.LOCAL_WRITE, target: "locFloat", occurrence: 0)]
     public static void LocalWrite(float val)
     {
-        Console.WriteLine($"Field write: {val}");
+        Console.WriteLine($"Local write: {val}");
     }
 }
 ```
@@ -406,14 +407,14 @@ public class Target
     public float ClassVar;
     public void ReadAndWriteVars(float num)
     {
-+       Console.WriteLine($"Field write: {locFloat}");
++       Console.WriteLine($"Local write: {locFloat}");
         float locFloat = 99f;
         
 -        if (locFloat > num)
 +        if (locFloat /* locFloat is read and the method is called, but it's hard to show */ > num)
         {
             ClassVar = locFloat;
-+           Console.WriteLine($"Field read: {locFloat}");
++           Console.WriteLine($"Local read: {locFloat}");
         }
         else
         {
@@ -423,37 +424,42 @@ public class Target
 }
 ```
 
-### ARG_READ/WRITE
-```csharp
-using HarmonyLib.PatchExtensions;
-
-public static class ArgPatches
-{
-    
-}
-```
-Result:
-```diff
-public class Target
-{
-    
-}
-```
-
-### FIELD_READ/WRITE
+### Assembly FIELD_READ/WRITE
 ```csharp
 using HarmonyLib.PatchExtensions;
 
 public static class FieldPatches
 {
+    [AssemblyPatch(fieldDeclaringType: typeof(Target), fieldName: nameof(NewMovement.Variable), at: AT.FIELD_READ, scanEntireAssembly: true, occurrence: 0)]
+    public static void FieldRead(float val)
+    {
+        Console.WriteLine($"Variable read: {val}");
+    }
     
+    [AssemblyPatch(fieldDeclaringType: typeof(Target), fieldName: nameof(NewMovement.Variable), at: AT.FIELD_WRITE, scanEntireAssembly: true, occurrence: 0)]
+    public static void FieldWrite(float val)
+    {
+        Console.WriteLine($"Variable written: {val}");
+    }
 }
 ```
 Result:
 ```diff
 public class Target
 {
+    public float Variable;
     
+    public void DoWhatever(float writeVar)
+    {
++        Console.WriteLine($"Variable written: {writeVar}");
+        Variable = writeVar;
+    }
+    
+    public void SomethingElse(ref float someVar)
+    {
+        someVar = Variable;
++        Console.WriteLine($"Variable read: {Variable}");
+    }
 }
 ```
 

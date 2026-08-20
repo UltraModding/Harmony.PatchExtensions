@@ -149,13 +149,13 @@ namespace HarmonyLib.PatchExtensions
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
     public class PatchAttribute : Attribute
     {
-        internal bool DoNotPatch = true;
+        internal bool DoNotPatch { get; private set; }= true;
         
         /// <summary>
         /// The original method in the that will be modified.
         /// </summary>
         public MethodInfo? TargetMethod { get; }
-
+        
         /// <summary>
         /// The location or type of patch HEAD, RETURN, POSTFIX, INVOKE, REDIRECT, AFTER
         /// </summary>
@@ -195,13 +195,19 @@ namespace HarmonyLib.PatchExtensions
         public uint ArgIndex { get; } = 0;
         
         /// <summary>
+        /// For <see cref="AT.FIELD_READ/FIELD_WRITE"/>
+        /// If the target is inside a different Type than the TargetMember Method
+        /// </summary>
+        public Type? TargetType { get; }
+        
+        /// <summary>
         /// Defines a patch for a specific method.
         /// </summary>
         /// <param name="type">The class type containing the method you want to patch.</param>
         /// <param name="methodName">The name of the method you want to patch.</param>
         /// <param name="at">The injection point (HEAD, RETURN, POSTFIX, INVOKE, REDIRECT, AFTER).</param>
-        /// <param name="target">
-        /// (Optional) For <see cref="AT.INVOKE"/> or <see cref="AT.REDIRECT"/> or <see cref="AT.AFTER"/>, this is the name of the method being called inside the target.
+        /// <param name="targetMember">
+        /// (Optional) For <see cref="AT.INVOKE"/> or <see cref="AT.REDIRECT"/> or <see cref="AT.AFTER"/>, this is the name of the method being called inside the targetMember.
         /// </param>
         /// <param name="overwriting">
         /// (Optional) For <see cref="AT.HEAD"/>, set to true to cancel.
@@ -221,7 +227,11 @@ namespace HarmonyLib.PatchExtensions
         /// What argument index to replace
         /// Use 1 to start from the first match (0 gives error)
         /// </param>
-        public PatchAttribute(Type type, string methodName, AT at, string? target = null, uint occurrence = 0, uint startIndex = 0, uint argIndex = 0, bool overwriting = false)
+        /// <para name="targetType">
+        /// For <see cref="AT.FIELD_READ/FIELD_WRITE"/>
+        /// If the targetMember is inside a different Type than the TargetMember Method
+        /// </para>
+        public PatchAttribute(Type type, string methodName, AT at, string? targetMember = null, Type? targetType = null, uint occurrence = 0, uint startIndex = 0, uint argIndex = 0, bool overwriting = false)
         {
             TargetMethod = type.GetMethod(methodName, 
                 BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) ?? null;
@@ -231,13 +241,13 @@ namespace HarmonyLib.PatchExtensions
                 Logger.LogError($"Could not find method '{methodName}' in type '{type.FullName}', not running this patch.");
                 return;
             }
-
-            if (string.IsNullOrEmpty(target) && at is AT.INVOKE or AT.REDIRECT or AT.AFTER)
+            
+            if (string.IsNullOrEmpty(targetMember) && at is AT.INVOKE or AT.REDIRECT or AT.AFTER or AT.LOCAL_WRITE or AT.LOCAL_READ or AT.FIELD_WRITE or AT.FIELD_READ or AT.ARG_WRITE or AT.ARG_READ)
             {
-                Logger.LogError($"target is null or empty, not running this patch.");
+                Logger.LogError($"targetMember is null or empty, not running this patch.");
                 return;
             }
-            TargetMember = target!;
+            TargetMember = targetMember!;
             
             if (at is AT.ARG && argIndex == 0)
             {
@@ -245,6 +255,8 @@ namespace HarmonyLib.PatchExtensions
                 return;
             }
             ArgIndex = argIndex;
+            
+            TargetType = targetType!;
             
             // if (occurrence == uint.MaxValue && at is AT.INVOKE or AT.AFTER or AT.REDIRECT)
             // {
@@ -261,6 +273,55 @@ namespace HarmonyLib.PatchExtensions
                 Logger.LogWarning($"FYI, overwriting set on a non head AT does nothing");
             }
             Overwriting = overwriting;
+            
+            DoNotPatch = false;
+        }
+    }
+    
+    [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
+    public class AssemblyPatchAttribute : Attribute
+    {
+        public bool DoNotPatch { get; private set; } = true;
+        
+        public bool TargetAssembly { get; }
+        public Type TargetType { get; }
+        public string TargetMember { get; }
+        public AT At { get; }
+        public bool ScanEntireAssembly { get; }
+        public uint Occurrence { get; }
+        
+        public AssemblyPatchAttribute(
+            Type? fieldDeclaringType,
+            string fieldName,
+            AT at,
+            bool scanEntireAssembly = false,
+            uint occurrence = 0)
+        {
+            DoNotPatch = true;
+            
+            TargetAssembly = true;
+            TargetType = fieldDeclaringType;
+            TargetMember = fieldName;
+            At = at;
+            ScanEntireAssembly = scanEntireAssembly;
+            Occurrence = occurrence;
+            
+            if (fieldDeclaringType == null)
+            {
+                Logger.LogError("fieldDeclaringType is null, not running this patch.");
+                return;
+            }
+            
+            if (string.IsNullOrEmpty(fieldName))
+            {
+                Logger.LogError("fieldName is null or empty, not running this patch.");
+                return;
+            }
+            
+            if (at != AT.FIELD_READ && at != AT.FIELD_WRITE)
+            {
+                Logger.LogError($"AssemblyPatchAttribute only supports FIELD_READ/FIELD_WRITE, not {at}.");
+            }
             
             DoNotPatch = false;
         }

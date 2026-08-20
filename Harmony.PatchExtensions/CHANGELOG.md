@@ -8,6 +8,8 @@ Implemented LOCAL_WRITE/READ
 Implemented ARG_WRITE/READ
 Implemented FIELD_WRITE/READ
 
+Added assembly patching for field read and write
+
 Internally implemented more helpers, tests and a test console project
 Added lots of documentation
 

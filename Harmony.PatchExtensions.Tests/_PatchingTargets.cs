@@ -200,10 +200,28 @@ public class PatchingTargets
     {
         int total = a;
         total += b;
-        
+
         return total;
     }
-    
+
+    public int LocalWriteTwice3(int a, int b)
+    {
+        int total = a;
+        total += b;
+
+        return total;
+    }
+
+    public int ReturnEarly(int value)
+    {
+        if (value < 0)
+        {
+            return -1;
+        }
+
+        return value;
+    }
+
     public int SomeField2;
     
     public void AccessFieldTwice2()
@@ -271,9 +289,15 @@ public class PatchingTargets
         public static int BranchTrueCalls;
         public static int BranchFalseCalls;
         public static int LocalWriteCalls;
+        public static int LocalWriteCalls2;
+        public static int LocalReadCalls;
+        public static int LastLocalWriteValue;
+        public static int LastLocalWriteValue2;
+        public static int LastLocalReadValue;
+        public static int ReturnCalls;
         public static int FinallySwallowCalls;
         public static Exception? LastFinallyException;
-        
+
         public static void Reset()
         {
             AddCalls = 0;
@@ -292,6 +316,12 @@ public class PatchingTargets
             BranchTrueCalls = 0;
             BranchFalseCalls = 0;
             LocalWriteCalls = 0;
+            LocalWriteCalls2 = 0;
+            LocalReadCalls = 0;
+            LastLocalWriteValue = 0;
+            LastLocalWriteValue2 = 0;
+            LastLocalReadValue = 0;
+            ReturnCalls = 0;
             FinallySwallowCalls = 0;
             LastFinallyException = null;
         }

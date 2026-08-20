@@ -1,6 +1,8 @@
 using System.Reflection;
 using System.Reflection.Emit;
 
+using HarmonyLib.Tools;
+
 using Mono.Cecil;
 
 namespace HarmonyLib.PatchExtensions;
@@ -81,6 +83,18 @@ public static class TranspilerApplier
                             case AT.LOCAL_WRITE:
                                 LocalWrite(original, matcher, config, generator);
                                 break;
+                            case AT.ARG_READ:
+                                ArgRead(original, matcher, config, generator);
+                                break;
+                            case AT.ARG_WRITE:
+                                ArgWrite(original, matcher, config, generator);
+                                break;
+                            case AT.FIELD_READ:
+                                FieldRead(original, matcher, config, generator);
+                                break;
+                            case AT.FIELD_WRITE:
+                                FieldWrite(original, matcher, config, generator);
+                                break;
                         }
                         
                         if (config.Occurrence != 0)
@@ -91,10 +105,11 @@ public static class TranspilerApplier
                 matcher.Advance(1);
             }
             
-            // foreach (var instur in matcher.Instructions())
-            // {
-            //     FileLog.Log(instur.ToString());
-            // }
+            Logger.LogFile($"-- {config.PatchMethod.Name} ---");
+            foreach (var instur in matcher.Instructions())
+            {
+                Logger.LogFile($"{instur.opcode}   {instur.operand}");
+            }
         }
         
         return matcher.InstructionEnumeration();
@@ -102,13 +117,115 @@ public static class TranspilerApplier
     
     #region ARG_R/W
     
+    private static void ArgWrite(
+        MethodBase original,
+        CodeMatcher matcher,
+        TranspilerConfig config,
+        ILGenerator generator
+    )
+    {
+        Dictionary<int, string> argsIndex = new();
+        for (int i = 0; i < original.GetParameters().Length; i++)
+        {
+            var parameterInfo = original.GetParameters()[i];
+            argsIndex.Add(i, parameterInfo.Name);
+        }
+        
+        var instruction = matcher.Instruction;
+        if (OpCodeHelper.TryGetArgIndex(instruction, out int index, out bool isWrite, out bool isAddress))
+        {
+            if (!isWrite || isAddress)
+                return;
+            
+            if (argsIndex.TryGetValue(index, out string name) && name == config.TargetMember)
+            {
+                Logger.Log($"Writing arg: {name}");
+                matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Dup));
+                matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Call, config.PatchMethod));
+            }
+        }
+    }
     
+    private static void ArgRead(
+        MethodBase original,
+        CodeMatcher matcher,
+        TranspilerConfig config,
+        ILGenerator generator
+    )
+    {
+        Dictionary<int, string> argsIndex = new();
+        for (int i = 0; i < original.GetParameters().Length; i++)
+        {
+            var parameterInfo = original.GetParameters()[i];
+            argsIndex.Add(i, parameterInfo.Name);
+            // Logger.Log($"parameterInfo: [{i}] {parameterInfo.Name}, {parameterInfo.ParameterType}");
+        }
+        
+        var instruction = matcher.Instruction;
+        if (OpCodeHelper.TryGetArgIndex(instruction, out int index, out bool isWrite, out bool isAddress))
+        {
+            if (isWrite || isAddress)
+                return;
+            
+            if (argsIndex.TryGetValue(index, out string name) && name == config.TargetMember)
+            {
+                // Logger.Log($"Reading arg: {name}");
+                matcher.Advance(1);
+                matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Dup));
+                matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Call, config.PatchMethod));
+            }
+        }
+    }
     
     #endregion
     
     #region FIELD_R/W
     
+    private static void FieldRead(
+        MethodBase original,
+        CodeMatcher matcher,
+        TranspilerConfig config,
+        ILGenerator generator
+    )
+    {
+        var instruction = matcher.Instruction;
+        
+        if (OpCodeHelper.TryGetFieldInfo(instruction, out FieldInfo info, out bool isWrite, out bool isAddress, out bool isStatic))
+        {
+            if (isWrite || isAddress)
+                return;
+            
+            if (info.Name == config.TargetMember && (config.TargetType == null || info.DeclaringType == config.TargetType))
+            {
+                // Logger.Log($"{instruction.opcode}   {instruction.operand}\nField: {info.Name}");
+                matcher.Advance(1);
+                matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Dup));
+                matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Call, config.PatchMethod));
+            }
+        }
+    }
     
+    private static void FieldWrite(
+        MethodBase original,
+        CodeMatcher matcher,
+        TranspilerConfig config,
+        ILGenerator generator
+    )
+    {
+        var instruction = matcher.Instruction;
+        
+        if (OpCodeHelper.TryGetFieldInfo(instruction, out FieldInfo info, out bool isWrite, out bool isAddress, out bool isStatic))
+        {
+            if (!isWrite || isAddress)
+                return;
+            
+            if (info.Name == config.TargetMember && (config.TargetType == null || info.DeclaringType == config.TargetType))
+            {
+                matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Dup));
+                matcher.InsertAndAdvance(new CodeInstruction(OpCodes.Call, config.PatchMethod));
+            }
+        }
+    }
     
     #endregion
     
@@ -446,14 +563,14 @@ public static class TranspilerApplier
     
     private static bool Matcher(CodeInstruction instruction, TranspilerConfig config, string requiredMethod, string requiredClass, CodeMatcher matcher)
     {
-        // FileLog.Log(instruction.ToString());
+        Logger.LogFile($"{instruction.opcode}   {instruction.operand}");
         
         bool isRet = instruction.opcode == OpCodes.Ret;
         if (config.Type == AT.RETURN)
             return isRet;
         
         bool isBranch = OpCodeHelper.IsBranch(instruction.opcode);
-        if (config.Type == AT.BRANCH_TRUE || config.Type == AT.BRANCH_FALSE)
+        if (config.Type is AT.BRANCH_TRUE or AT.BRANCH_FALSE)
             return isBranch;
 
         if (config.Type is AT.LOOP_BEFORE or AT.LOOP_TOP or AT.LOOP_BOTTOM or AT.LOOP_AFTER)
@@ -463,8 +580,15 @@ public static class TranspilerApplier
         if (config.Type is AT.LOCAL_READ or AT.LOCAL_WRITE)
             return isLoc;
         
-        bool isMethod = OpCodeHelper.IsMethod(instruction.opcode);
+        bool isArg = OpCodeHelper.IsArgOpcode(instruction.opcode);
+        if (config.Type is AT.ARG_READ or AT.ARG_WRITE)
+            return isArg;
+        
         bool isField = OpCodeHelper.IsField(instruction.opcode);
+        if (config.Type is AT.FIELD_READ or AT.FIELD_WRITE)
+            return isField;
+        
+        bool isMethod = OpCodeHelper.IsMethod(instruction.opcode);
         if (!isMethod && !isField)
             return false;
         

@@ -23,7 +23,7 @@ public static class MixinLoader
     }
     
     /// <summary>
-    /// Defines how conflicts between patches should be resolved when multiple patches target the same method.
+    /// Defines how conflicts between patches should be resolved when multiple patches targetMember the same method.
     /// </summary>
     public enum ConflictResolver
     {
@@ -52,6 +52,7 @@ public static class MixinLoader
     private static ModuleBuilder _moduleBuilder;
     
     internal static Dictionary<MethodBase, List<TranspilerConfig>> QueuedTranspilers = new();
+    internal static Dictionary<Assembly, List<TranspilerConfig>> AssemblyTranspilers = new();
     private static Dictionary<MethodInfo, List<QueuedPatch>> _queuedPatches = new();
     
     /// <summary>
@@ -142,7 +143,7 @@ public static class MixinLoader
                         case AT.HEAD:
                         case AT.POSTFIX:
                         case AT.FINALLY:
-                            if (!_queuedPatches.ContainsKey(attr.TargetMethod))
+                            if (!_queuedPatches.ContainsKey(attr.TargetMethod!))
                                 _queuedPatches[attr.TargetMethod] = new List<QueuedPatch>();
                             
                             _queuedPatches[attr.TargetMethod].Add(patch);
@@ -154,37 +155,102 @@ public static class MixinLoader
                         case AT.LOOP_TOP:
                         case AT.LOOP_BOTTOM:
                         case AT.LOOP_AFTER:
-                            if (!QueuedTranspilers.ContainsKey(attr.TargetMethod))
-                                QueuedTranspilers[attr.TargetMethod] = new List<TranspilerConfig>();
-                            
-                            QueuedTranspilers[attr.TargetMethod].Add(new TranspilerConfig(
-                                type: attr.At,
-                                targetMember: attr.TargetMember,
-                                patchMethod: patchMethod,
-                                occurrence: attr.Occurrence,
-                                startIndex: attr.StartIndex,
-                                argIndex: attr.ArgIndex)
+                            AddTranspiler(QueuedTranspilers, attr.TargetMethod!,
+                                new TranspilerConfig(
+                                    type: attr.At,
+                                    targetMember: attr.TargetMember,
+                                    patchMethod: patchMethod,
+                                    occurrence: attr.Occurrence,
+                                    startIndex: attr.StartIndex,
+                                    argIndex: attr.ArgIndex,
+                                    targetType: attr.TargetType!
+                                )
                             );
                             break;
                         default:
                             if (string.IsNullOrEmpty(attr.TargetMember))
                             {
-                                Logger.LogWarning($"You must set 'target' in {patchMethod.Name} when using AT.{attr.At}");
+                                Logger.LogWarning($"You must set 'targetMember' in {patchMethod.Name} when using AT.{attr.At}");
                                 continue;
                             }
                             
-                            if (!QueuedTranspilers.ContainsKey(attr.TargetMethod))
-                                QueuedTranspilers[attr.TargetMethod] = new List<TranspilerConfig>();
-                            
-                            QueuedTranspilers[attr.TargetMethod].Add(new TranspilerConfig(
-                                type: attr.At,
-                                targetMember: attr.TargetMember,
-                                patchMethod: patchMethod,
-                                occurrence: attr.Occurrence,
-                                startIndex: attr.StartIndex,
-                                argIndex: attr.ArgIndex)
+                            AddTranspiler(QueuedTranspilers, attr.TargetMethod!,
+                                new TranspilerConfig(
+                                    type: attr.At,
+                                    targetMember: attr.TargetMember,
+                                    patchMethod: patchMethod,
+                                    occurrence: attr.Occurrence,
+                                    startIndex: attr.StartIndex,
+                                    argIndex: attr.ArgIndex,
+                                    targetType: attr.TargetType!
+                                )
                             );
                             break;
+                    }
+                }
+                
+                var asmAttrs = patchMethod.GetCustomAttributes<AssemblyPatchAttribute>();
+                foreach (var attr in asmAttrs)
+                {
+                    if (attr.DoNotPatch)
+                    {
+                        Logger.LogWarning($"{patchMethod.Name} has attribute errors so it has been skipped");
+                        continue;
+                    }
+                    
+                    Assembly targAsm = attr.TargetType.Assembly;
+                    if (!AssemblyTranspilers.ContainsKey(targAsm))
+                        AssemblyTranspilers[targAsm] = new List<TranspilerConfig>();
+                    
+                    AssemblyTranspilers[targAsm].Add(new TranspilerConfig(
+                        type: attr.At,
+                        targetMember: attr.TargetMember,
+                        patchMethod: patchMethod,
+                        occurrence: attr.Occurrence,
+                        startIndex: 0,
+                        argIndex: 0,
+                        targetType: attr.TargetType
+                    ));
+                }
+            }
+        }
+        
+        // for assembly transpilers read the assembly and add queued transpilersS
+        foreach (KeyValuePair<Assembly, List<TranspilerConfig>> thing in AssemblyTranspilers)
+        {
+            Assembly targetAssembly = thing.Key;
+            List<TranspilerConfig> configs = thing.Value;
+            
+            foreach (var config in configs)
+            {
+                if (string.IsNullOrEmpty(config.TargetMember))
+                {
+                    Logger.LogError($"TargetMember is null or empty in {config.PatchMethod.Name}");
+                    continue;
+                }
+                
+                FieldInfo? fieldInfo = config.TargetType?.GetField(config.TargetMember)
+                    ?? throw new InvalidOperationException($"TargetType required to resolve field '{config.TargetMember}'");
+                
+                IEnumerable<Type> typesToScan = config.TargetType != null
+                                                                  ? new[] { config.TargetType }
+                                                                  : targetAssembly.GetTypes();
+                foreach (var type in typesToScan)
+                {
+                    foreach (MethodBase methodBase in OpCodeHelper.FindMethodsUsingField(type, fieldInfo))
+                    {
+                        if (!QueuedTranspilers.ContainsKey(methodBase))
+                            QueuedTranspilers[methodBase] = new List<TranspilerConfig>();
+                        
+                        QueuedTranspilers[methodBase].Add(new TranspilerConfig(
+                            type: config.Type,
+                            targetMember: null,
+                            patchMethod: config.PatchMethod,
+                            occurrence: config.Occurrence,
+                            startIndex: 0,
+                            argIndex: 0,
+                            targetType: config.TargetType!)
+                        );
                     }
                 }
             }
@@ -209,6 +275,7 @@ public static class MixinLoader
         {
             try
             {
+                Logger.Log($"Processing patch for {targetMethod.Name}");
                 harmony.Patch(targetMethod, transpiler: transpiler);
                 Logger.Log($"Processed patch for {targetMethod.Name}");
             }
@@ -235,4 +302,14 @@ public static class MixinLoader
         }
     }
     
+    private static void AddTranspiler<TKey>(
+        Dictionary<TKey, List<TranspilerConfig>> dict,
+        TKey key,
+        TranspilerConfig config
+    )
+    {
+        if (!dict.TryGetValue(key, out var list))
+            dict[key] = list = new List<TranspilerConfig>();
+        list.Add(config);
+    }
 }

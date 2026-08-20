@@ -122,37 +122,37 @@ public class INVOKETests : IDisposable
 
 public static class InvokePatches
 {
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.CallHelpersTwice), AT.INVOKE, target: "PatchingHelper.Nothin", occurrence: 2)]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.CallHelpersTwice), AT.INVOKE, targetMember: "PatchingHelper.Nothin", occurrence: 2)]
     public static void BeforeSecondNothin()
     {
         PatchingTargets.CallCounter.NothinCalls++;
     }
 
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.CallHelpersTwice2), AT.INVOKE, target: "PatchingHelper.Nothin", occurrence: 1)]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.CallHelpersTwice2), AT.INVOKE, targetMember: "PatchingHelper.Nothin", occurrence: 1)]
     public static void BeforeFirstNothin()
     {
         PatchingTargets.CallCounter.AddCalls++;
     }
 
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.CallHelpersTwice3), AT.INVOKE, target: "PatchingHelper.Nothin", occurrence: 0)]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.CallHelpersTwice3), AT.INVOKE, targetMember: "PatchingHelper.Nothin", occurrence: 0)]
     public static void BeforeAllNothin()
     {
         PatchingTargets.CallCounter.AddCalls2++;
     }
 
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.CallHelpersTwice4), AT.INVOKE, target: "PatchingHelper.Nothin", occurrence: 1, startIndex: 1)]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.CallHelpersTwice4), AT.INVOKE, targetMember: "PatchingHelper.Nothin", occurrence: 1, startIndex: 1)]
     public static void BeforeFirstNothinAfterStartIndex()
     {
         PatchingTargets.CallCounter.AddCalls3++;
     }
 
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.AccessFieldTwice), AT.INVOKE, target: "SomeField", occurrence: 2)]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.AccessFieldTwice), AT.INVOKE, targetMember: "SomeField", occurrence: 2)]
     public static void BeforeSecondFieldAccess()
     {
         PatchingTargets.CallCounter.FieldAccessCalls++;
     }
 
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.CallBarThenFooAdjusted), AT.INVOKE, target: "PatchingHelper.Bar")]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.CallBarThenFooAdjusted), AT.INVOKE, targetMember: "PatchingHelper.Bar")]
     public static void BeforeBarForStack()
     {
         PatchingTargets.CallCounter.InvokeStackCalls++;

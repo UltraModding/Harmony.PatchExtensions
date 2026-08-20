@@ -108,31 +108,31 @@ public class AFTERTests : IDisposable
 
 public static class AfterPatches
 {
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.CallHelpersTwice5), AT.AFTER, target: "PatchingHelper.Nothin", occurrence: 2)]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.CallHelpersTwice5), AT.AFTER, targetMember: "PatchingHelper.Nothin", occurrence: 2)]
     public static void AfterSecondNothin()
     {
         PatchingTargets.CallCounter.NothinCalls++;
     }
 
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.CallHelpersTwice6), AT.AFTER, target: "PatchingHelper.Nothin", occurrence: 1)]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.CallHelpersTwice6), AT.AFTER, targetMember: "PatchingHelper.Nothin", occurrence: 1)]
     public static void AfterFirstNothin()
     {
         PatchingTargets.CallCounter.AddCalls++;
     }
 
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.CallHelpersTwice7), AT.AFTER, target: "PatchingHelper.Nothin", occurrence: 0)]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.CallHelpersTwice7), AT.AFTER, targetMember: "PatchingHelper.Nothin", occurrence: 0)]
     public static void AfterAllNothin()
     {
         PatchingTargets.CallCounter.AddCalls2++;
     }
 
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.CallHelpersTwice), AT.AFTER, target: "PatchingHelper.Nothin", occurrence: 1, startIndex: 1)]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.CallHelpersTwice), AT.AFTER, targetMember: "PatchingHelper.Nothin", occurrence: 1, startIndex: 1)]
     public static void AfterFirstNothinAfterStartIndex()
     {
         PatchingTargets.CallCounter.AddCalls3++;
     }
 
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.CallBarThenFoo), AT.AFTER, target: "PatchingHelper.Bar")]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.CallBarThenFoo), AT.AFTER, targetMember: "PatchingHelper.Bar")]
     public static void AfterBarForStack()
     {
         PatchingTargets.CallCounter.AfterStackCalls++;

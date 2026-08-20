@@ -38,7 +38,7 @@ public class INSERTTests : IDisposable
 
 public static class REDIRECTPatches
 {
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.Double), AT.REDIRECT, target: "PatchingHelper.Double")]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.Double), AT.REDIRECT, targetMember: "PatchingHelper.Double")]
     public static int ReplaceDouble(int value)
     {
         return 68;

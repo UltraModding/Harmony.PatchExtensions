@@ -2,15 +2,15 @@ using HarmonyLib.Tools;
 
 namespace HarmonyLib.PatchExtensions.Tests;
 
-public class FinallyTests : IDisposable
+public class FINALLYTests : IDisposable
 {
     private readonly Harmony _harmony;
     
-    public FinallyTests()
+    public FINALLYTests()
     {
         _harmony = new Harmony("tests.patchextensions.finally");
         MixinLoader.ConflictResolutionMethod = MixinLoader.ConflictResolver.Error;
-        MixinLoader.ApplyPatches(_harmony, typeof(FinallyTests).Assembly, typeof(FinallyPatches));
+        MixinLoader.ApplyPatches(_harmony, typeof(FINALLYTests).Assembly, typeof(FINALLYPatches));
     }
     
     [Fact]
@@ -56,7 +56,7 @@ public class FinallyTests : IDisposable
     public void Dispose() => _harmony.UnpatchSelf();
 }
 
-public static class FinallyPatches
+public static class FINALLYPatches
 {
     [Patch(typeof(PatchingTargets), nameof(PatchingTargets.DivideOrThrow), AT.FINALLY)]
     public static void RecordFinally(Exception __exception)

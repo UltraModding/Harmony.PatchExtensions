@@ -59,13 +59,13 @@ public class REDIRECTTests : IDisposable
 
 public static class RedirectPatches
 {
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.Double), AT.REDIRECT, target: "PatchingHelper.Double")]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.Double), AT.REDIRECT, targetMember: "PatchingHelper.Double")]
     public static int ReplaceDouble(int value)
     {
         return 68;
     }
 
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.CallBarThenFooAdjusted), AT.REDIRECT, target: "PatchingHelper.Bar")]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.CallBarThenFooAdjusted), AT.REDIRECT, targetMember: "PatchingHelper.Bar")]
     public static float ReplaceBarForStack(float value)
     {
         PatchingTargets.CallCounter.RedirectStackCalls++;

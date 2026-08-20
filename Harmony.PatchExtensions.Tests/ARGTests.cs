@@ -140,32 +140,32 @@ public static class ArgPatches
     // startIndex is the value
     // occurrence is the call
     
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgs), AT.ARG, target: "PatchingHelper.BarTwoArgs", occurrence: 0, argIndex: 2)]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgs), AT.ARG, targetMember: "PatchingHelper.BarTwoArgs", occurrence: 0, argIndex: 2)]
     public static float ReplaceOffset(float original)
     {
         return original * 2;
     }
     
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgsTwice), AT.ARG, target: "PatchingHelper.BarTwoArgs", occurrence: 2, argIndex: 2)]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgsTwice), AT.ARG, targetMember: "PatchingHelper.BarTwoArgs", occurrence: 2, argIndex: 2)]
     public static float ReplaceOffsetBarWithTwoArgsTwice(float original)
     {
         return original * 2;
     }
     
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgsTwice2), AT.ARG, target: "PatchingHelper.BarTwoArgs", occurrence: 0, argIndex: 2)]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgsTwice2), AT.ARG, targetMember: "PatchingHelper.BarTwoArgs", occurrence: 0, argIndex: 2)]
     public static float ReplaceOffsetBarWithTwoArgsTwice2(float original)
     {
     return original * 2;
     }
     
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgsTwice3), AT.ARG, target: "PatchingHelper.BarTwoArgs", occurrence: 2, argIndex: 1)]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithTwoArgsTwice3), AT.ARG, targetMember: "PatchingHelper.BarTwoArgs", occurrence: 2, argIndex: 1)]
     public static float ReplaceOffsetBarWithTwoArgsTwice3(float original)
     {
         return original;
     }
     
     // // Test for index problems
-    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithThreeArgs), AT.ARG, target: "PatchingHelper.BarThreeArgs", occurrence: 2, argIndex: 2)]
+    [Patch(typeof(PatchingTargets), nameof(PatchingTargets.BarWithThreeArgs), AT.ARG, targetMember: "PatchingHelper.BarThreeArgs", occurrence: 2, argIndex: 2)]
     public static float ReplaceOffsetBarWithThreeArgs(float original)
     {
         return original * 2;

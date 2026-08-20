@@ -46,7 +46,7 @@ internal static class ConflictResolver
             MethodBase method = trans.Key;
             List<TranspilerConfig> configs = trans.Value;
             
-            var groupBy = configs.GroupBy(t => (t.TargetMember, t.StartIndex, t.Occurrence));
+            var groupBy = configs.GroupBy(t => (TargetMember: t.TargetMember, t.StartIndex, t.Occurrence));
             
             foreach (var config in groupBy.Where(grouping => grouping.Count() > 1))
             {
